@@ -1,0 +1,24 @@
+# DeskcommCRM — override para VPS gerenciada pelo Laravel Forge.
+#
+#   docker compose -f docker-compose.prod.yml -f docker-compose.forge.yml --env-file .env up -d
+#
+# QUANDO USAR
+# -----------
+# O Forge já tem um Nginx nas portas 80/443 servindo outros sites. O Caddy do
+# kit quer as mesmas portas e não sobe. Com este override:
+#
+#   1. o serviço `app` publica a porta 3000 em 127.0.0.1:3100 — só o Nginx
+#      local consegue alcançar (não fica exposta na internet);
+#   2. o serviço `caddy` ganha um profile que nunca é ativado — o compose
+#      simplesmente não o cria (o Nginx do Forge faz o papel dele).
+#
+# No Forge, crie um site com o domínio e edite a configuração do Nginx para
+# fazer proxy_pass para http://127.0.0.1:3100. O Forge cuida do SSL.
+
+services:
+  app:
+    ports:
+      - "127.0.0.1:3100:3000"
+
+  caddy:
+    profiles: ["caddy-nao-usado-com-forge"]
