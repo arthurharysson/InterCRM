@@ -15,10 +15,11 @@
 3. [Servicos Docker (o que roda)](#3-servicos-docker-o-que-roda)
 4. [Passo a passo do deploy inicial](#4-passo-a-passo-do-deploy-inicial)
 5. [Como publicar uma atualizacao sua](#5-como-publicar-uma-atualizacao-sua)
-6. [Variaveis de ambiente (completo)](#6-variaveis-de-ambiente-completo)
-7. [Configuracao do Nginx (Forge)](#7-configuracao-do-nginx-forge)
-8. [Troubleshooting](#8-troubleshooting)
-9. [Comandos uteis do dia a dia](#9-comandos-uteis-do-dia-a-dia)
+6. [Codigo no disco vs app rodando (por que sao coisas diferentes)](#6-codigo-no-disco-vs-app-rodando)
+7. [Variaveis de ambiente (completo)](#7-variaveis-de-ambiente-completo)
+8. [Configuracao do Nginx (Forge)](#8-configuracao-do-nginx-forge)
+9. [Troubleshooting](#9-troubleshooting)
+10. [Comandos uteis do dia a dia](#10-comandos-uteis-do-dia-a-dia)
 
 ---
 
@@ -299,7 +300,262 @@ docker compose \
 
 ---
 
-## 6. Variaveis de ambiente (completo)
+## 6. Codigo no disco vs app rodando
+
+### Por que existem duas coisas separadas
+
+Este e o ponto que mais confunde. Na VPS existem **duas coisas independentes**:
+
+| | **Codigo no disco** | **App rodando (containers Docker)** |
+|---|---|---|
+| **O que e** | Os arquivos do repositorio Git | Imagens Docker pre-construidas pelo CI |
+| **Onde fica** | `/home/forge/crm.intercert.com.br/releases/000000/` | Dentro dos containers (isolados) |
+| **Como atualiza** | `git pull origin main` | `docker compose pull` + `up -d` |
+| **Quem dispara** | Forge (push to deploy) ou voce via SSH | Voce via SSH (manual) |
+| **Para que serve** | Docs, migrations, scripts, docker-compose.yml, .env | O app que o usuario acessa no browser |
+
+**O app que roda no browser NAO le os arquivos do disco.** Ele roda de dentro da imagem Docker, que foi construida pelo GitHub Actions e publicada no GHCR.
+
+### Diagrama do fluxo completo
+
+```
+Voce altera codigo
+       |
+       v
+git push origin main
+       |
+       ├──> GitHub Actions (CI)                    ├──> Forge (push to deploy)
+       |    Constroi 3 imagens Docker              |    Roda o deploy script
+       |    Publica no GHCR                        |    = git pull no disco da VPS
+       |    (demora 3-5 min)                       |    (instantaneo)
+       |                                           |
+       v                                           v
+  Imagens novas no GHCR                     Codigo novo no disco
+  ghcr.io/arthurharysson/...               /home/forge/.../releases/000000/
+       |                                           |
+       |  (NAO e automatico)                       |  Atualiza:
+       |  Voce precisa rodar na VPS:               |  - docs/
+       |                                           |  - supabase/migrations/
+       v                                           |  - docker-compose*.yml
+  docker compose pull                              |  - scripts/
+  docker compose up -d                             |  - .github/workflows/
+       |
+       v
+  App atualizado no browser
+  (containers recriados)
+```
+
+### O que cada comando faz
+
+```bash
+# DIRETORIO BASE — todos os comandos abaixo partem daqui
+cd /home/forge/crm.intercert.com.br/releases/000000
+```
+
+#### 1. Atualizar o codigo no disco (Forge faz automatico, ou manual)
+
+```bash
+git pull origin main
+```
+
+**O que faz:** baixa os commits novos do GitHub para o disco da VPS.
+**O que atualiza:** docs, migrations, scripts, docker-compose, workflows.
+**O que NAO atualiza:** o app rodando. Os containers continuam com a imagem antiga.
+**Quando usar:** automaticamente via Forge, ou manual se precisar de um script/migration.
+
+#### 2. Puxar imagens Docker novas do GHCR
+
+```bash
+docker compose \
+  -f docker-compose.prod.yml \
+  -f docker-compose.forge.yml \
+  --env-file .env \
+  pull
+```
+
+**O que faz:** baixa as imagens mais recentes do GitHub Container Registry.
+**Pre-requisito:** o GitHub Actions precisa ter terminado de construir (3-5 min apos o push).
+**O que NAO faz:** nao reinicia containers. So baixa.
+
+#### 3. Recriar containers com as imagens novas
+
+```bash
+docker compose \
+  -f docker-compose.prod.yml \
+  -f docker-compose.forge.yml \
+  --env-file .env \
+  up -d
+```
+
+**O que faz:** compara a imagem de cada container com a que foi puxada. Se mudou, recria o container. Se nao mudou, nao toca.
+**Downtime:** ~5-10 segundos por container que mudou.
+**IMPORTANTE:** sempre inclua os DOIS arquivos compose (`-f docker-compose.prod.yml -f docker-compose.forge.yml`). Sem o forge.yml, o container perde a porta 3100 e o Nginx nao alcanca.
+
+#### 4. Ver o que esta rodando
+
+```bash
+docker compose \
+  -f docker-compose.prod.yml \
+  -f docker-compose.forge.yml \
+  ps
+```
+
+**O que mostra:** status de cada container (running/unhealthy/exited), portas, uptime.
+
+#### 5. Ver logs de um container
+
+```bash
+# Logs do app (ultimas 100 linhas, seguindo em tempo real)
+docker compose \
+  -f docker-compose.prod.yml \
+  -f docker-compose.forge.yml \
+  logs -f --tail 100 app
+
+# Logs do worker
+docker compose \
+  -f docker-compose.prod.yml \
+  -f docker-compose.forge.yml \
+  logs -f --tail 100 worker
+
+# Logs do WAHA
+docker compose \
+  -f docker-compose.prod.yml \
+  -f docker-compose.forge.yml \
+  logs -f --tail 100 waha
+
+# Logs de TODOS os servicos
+docker compose \
+  -f docker-compose.prod.yml \
+  -f docker-compose.forge.yml \
+  logs -f --tail 50
+```
+
+**O que mostra:** stdout/stderr do container. Erros, requisicoes, avisos.
+**Ctrl+C** para sair do modo follow (`-f`).
+
+#### 6. Reiniciar um container especifico
+
+```bash
+# Reiniciar so o app (sem puxar imagem nova)
+docker compose \
+  -f docker-compose.prod.yml \
+  -f docker-compose.forge.yml \
+  --env-file .env \
+  restart app
+
+# Reiniciar TUDO
+docker compose \
+  -f docker-compose.prod.yml \
+  -f docker-compose.forge.yml \
+  --env-file .env \
+  restart
+```
+
+**O que faz:** para e inicia o container. NAO puxa imagem nova. Util quando mudou o `.env` ou quer limpar estado.
+
+#### 7. Parar tudo
+
+```bash
+docker compose \
+  -f docker-compose.prod.yml \
+  -f docker-compose.forge.yml \
+  down
+```
+
+**O que faz:** para e remove todos os containers. Volumes (dados WAHA, Redis) sao preservados.
+**CUIDADO:** o app sai do ar ate rodar `up -d` de novo.
+
+#### 8. Parar e apagar TUDO (inclusive dados)
+
+```bash
+docker compose \
+  -f docker-compose.prod.yml \
+  -f docker-compose.forge.yml \
+  down -v
+```
+
+**O que faz:** para containers E apaga volumes. Sessoes WAHA (QR code) sao PERDIDAS.
+**NUNCA faca isso** a menos que queira recomecear do zero.
+
+#### 9. Ver uso de memoria e CPU
+
+```bash
+docker stats --no-stream
+```
+
+**O que mostra:** consumo de cada container. Util para saber se esta perto do limite.
+
+#### 10. Entrar dentro de um container (debug)
+
+```bash
+# Shell dentro do app
+docker compose \
+  -f docker-compose.prod.yml \
+  -f docker-compose.forge.yml \
+  exec app sh
+
+# Shell dentro do WAHA
+docker compose \
+  -f docker-compose.prod.yml \
+  -f docker-compose.forge.yml \
+  exec waha sh
+```
+
+**O que faz:** abre um terminal dentro do container. Util para debug.
+**Sair:** digite `exit`.
+
+#### 11. Health check (o app esta saudavel?)
+
+```bash
+# Teste rapido — so o HTTP code
+curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:3100
+# Esperado: 307 (redireciona pro login)
+
+# Health check completo (mostra Supabase, Redis, WAHA)
+curl -s http://127.0.0.1:3100/api/v1/health | python3 -m json.tool
+```
+
+### Deploy script do Forge (configuracao recomendada)
+
+No Forge > Sites > crm.intercert.com.br > Deployments > Deploy Script:
+
+```bash
+cd /home/forge/crm.intercert.com.br/releases/000000
+git pull origin main
+```
+
+**Isso faz:** a cada push na main, o Forge puxa o codigo novo automaticamente.
+**Isso NAO faz:** atualizar o app rodando. Para isso, voce roda o `docker compose pull + up -d` manualmente via SSH depois que o CI terminar.
+
+**Por que nao automatizar o Docker no Forge?** Porque o Forge dispara no instante do push, mas o CI leva 3-5 minutos para construir a imagem. Se o `docker compose pull` rodar antes do CI terminar, puxa a imagem antiga e nada muda.
+
+### Receita: "quero atualizar o app em producao"
+
+```bash
+# 1. Push local
+git push origin main
+
+# 2. Esperar o CI terminar (3-5 min)
+#    Verificar em: github.com/arthurharysson/InterCRM/actions
+
+# 3. SSH na VPS
+ssh forge@45.228.85.2
+# ou: ssh root@45.228.85.2
+
+# 4. Puxar e recriar
+cd /home/forge/crm.intercert.com.br/releases/000000
+docker compose -f docker-compose.prod.yml -f docker-compose.forge.yml --env-file .env pull
+docker compose -f docker-compose.prod.yml -f docker-compose.forge.yml --env-file .env up -d
+
+# 5. Verificar
+docker compose -f docker-compose.prod.yml -f docker-compose.forge.yml ps
+curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:3100
+# Esperado: 307
+```
+
+---
+
+## 7. Variaveis de ambiente (completo)
 
 ### Obrigatorias (o app nao sobe sem)
 
@@ -364,7 +620,7 @@ Sem essas, o compose usa as imagens do `melgarafael` (o upstream).
 
 ---
 
-## 7. Configuracao do Nginx (Forge)
+## 8. Configuracao do Nginx (Forge)
 
 No Forge > Sites > crm.intercert.com.br > Nginx Configuration:
 
@@ -432,13 +688,13 @@ server {
 
 ---
 
-## 8. Troubleshooting
+## 9. Troubleshooting
 
 ### 502 Bad Gateway no POST /login
 
 **Causa:** buffers do Nginx muito pequenos para os headers do Next.js Server Actions.
 
-**Solucao:** adicione as diretivas `proxy_buffer_size`, `proxy_buffers` e `proxy_busy_buffers_size` na config do Nginx (secao 7).
+**Solucao:** adicione as diretivas `proxy_buffer_size`, `proxy_buffers` e `proxy_busy_buffers_size` na config do Nginx (secao 8).
 
 ### 503 Service Unavailable
 
@@ -496,39 +752,47 @@ docker compose -f docker-compose.prod.yml -f docker-compose.forge.yml logs waha 
 
 ---
 
-## 9. Comandos uteis do dia a dia
+## 10. Referencia rapida de comandos
+
+Todos os comandos detalhados estao na secao 6. Aqui e o resumo para copiar e colar:
 
 ```bash
-# Diretorio base (ajuste se diferente)
-DIR="/home/forge/crm.intercert.com.br/releases/000000"
+# Ir para o diretorio do projeto
+cd /home/forge/crm.intercert.com.br/releases/000000
 
-# --- Status ---
-docker compose -f $DIR/docker-compose.prod.yml -f $DIR/docker-compose.forge.yml ps
+# Ver status dos containers
+docker compose -f docker-compose.prod.yml -f docker-compose.forge.yml ps
 
-# --- Logs em tempo real ---
-docker compose -f $DIR/docker-compose.prod.yml -f $DIR/docker-compose.forge.yml logs -f app
-docker compose -f $DIR/docker-compose.prod.yml -f $DIR/docker-compose.forge.yml logs -f worker
-docker compose -f $DIR/docker-compose.prod.yml -f $DIR/docker-compose.forge.yml logs -f waha
+# Atualizar codigo no disco
+git pull origin main
 
-# --- Reiniciar tudo ---
-docker compose -f $DIR/docker-compose.prod.yml -f $DIR/docker-compose.forge.yml --env-file $DIR/.env restart
-
-# --- Reiniciar so o app ---
-docker compose -f $DIR/docker-compose.prod.yml -f $DIR/docker-compose.forge.yml --env-file $DIR/.env restart app
-
-# --- Atualizar imagens e recriar ---
-cd $DIR
+# Atualizar app rodando (depois que o CI terminou)
 docker compose -f docker-compose.prod.yml -f docker-compose.forge.yml --env-file .env pull
 docker compose -f docker-compose.prod.yml -f docker-compose.forge.yml --env-file .env up -d
 
-# --- Ver uso de memoria ---
+# Logs em tempo real
+docker compose -f docker-compose.prod.yml -f docker-compose.forge.yml logs -f --tail 100 app
+docker compose -f docker-compose.prod.yml -f docker-compose.forge.yml logs -f --tail 100 worker
+docker compose -f docker-compose.prod.yml -f docker-compose.forge.yml logs -f --tail 100 waha
+
+# Reiniciar so o app
+docker compose -f docker-compose.prod.yml -f docker-compose.forge.yml --env-file .env restart app
+
+# Reiniciar tudo
+docker compose -f docker-compose.prod.yml -f docker-compose.forge.yml --env-file .env restart
+
+# Parar tudo (app sai do ar)
+docker compose -f docker-compose.prod.yml -f docker-compose.forge.yml down
+
+# Ver memoria e CPU
 docker stats --no-stream
 
-# --- Entrar no container do app (debug) ---
-docker compose -f $DIR/docker-compose.prod.yml -f $DIR/docker-compose.forge.yml exec app sh
-
-# --- Health check ---
+# Health check
+curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:3100
 curl -s http://127.0.0.1:3100/api/v1/health | python3 -m json.tool
+
+# Entrar no container do app
+docker compose -f docker-compose.prod.yml -f docker-compose.forge.yml exec app sh
 ```
 
 ---
