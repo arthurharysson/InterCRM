@@ -29,6 +29,9 @@ import type { ApiSuccess } from "@/lib/api/wrappers";
 import type { Contact } from "@/lib/types/contacts";
 import { NewContactDialog } from "@/components/contacts/NewContactDialog";
 
+vi.mock("@/hooks/auth/AuthProvider", () => ({
+  useActiveOrg: () => ({ currency: "BRL", country: null }),
+}));
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 vi.mock("@/hooks/i18n/useT", () => ({ useT: () => (s: string) => s }));
 vi.mock("@/components/feedback/ApiErrorToast", () => ({ showApiError: vi.fn() }));
@@ -57,6 +60,10 @@ const CONTATO = {
   created_at: "2026-09-14T10:00:00.000Z",
   updated_at: "2026-09-14T10:00:00.000Z",
   last_activity_at: null,
+  // Contato recém-criado pela tela ainda não é cliente: quem carimba é o
+  // agendamento, com a regra "Clientes pela agenda" ligada (migration 0262), e
+  // este caso é o do cadastro manual.
+  first_service_at: null,
 } satisfies Contact;
 
 /** O corpo que a rota devolve, tipado pelo retorno dela. */
