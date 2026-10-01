@@ -205,6 +205,11 @@ const schema = z.object({
   // é `canalGraphParceiroLigado()` em `lib/channels/graph-parceiro/credentials.ts`.
   DATAFY_ENABLED: z.string().optional().default(""),
 
+  // ─── Canal Web (InterSuite) — OPCIONAL ──────────────────────────────────
+  INTERSUITE_SUPPORT_URL: z.string().optional().default(""),
+  INTERSUITE_HMAC_SECRET_IN: z.string().optional().default(""),
+  INTERSUITE_HMAC_SECRET_OUT: z.string().optional().default(""),
+
   // Upstash Redis
   UPSTASH_REDIS_REST_URL: required("UPSTASH_REDIS_REST_URL"),
   UPSTASH_REDIS_REST_TOKEN: required("UPSTASH_REDIS_REST_TOKEN"),

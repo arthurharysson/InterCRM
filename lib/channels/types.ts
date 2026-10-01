@@ -9,7 +9,7 @@ import type { OutboundMedia } from "@/lib/waha/media-send";
 
 export type { OutboundMedia };
 
-export type ChannelProvider = "waha" | "meta_cloud" | "zernio" | "zernio_social" | "wacalls" | "datafy";
+export type ChannelProvider = "waha" | "meta_cloud" | "zernio" | "zernio_social" | "wacalls" | "datafy" | "web";
 
 /**
  * Os providers que transportam MENSAGEM — o subconjunto sobre o qual a matriz
@@ -164,6 +164,19 @@ export interface OutboundEnvelope extends ChannelTenantScope {
    * `undefined` = envio solto, que é o caso comum.
    */
   replyToExternalId?: string | null;
+
+  /**
+   * Id interno da conversa (`messages.conversation_id`). Canais tradicionais não
+   * precisam — o provider tem endereçamento próprio. O canal `web` precisa:
+   * o InterSuite usa o id para deduplicar e associar a thread.
+   */
+  conversationId?: string;
+  /** Id interno da mensagem (`messages.id`). Idem. */
+  messageId?: string;
+  /** Quem escreveu: `'ai'` ou `'agent'`. Sai de `messages.sent_via`. */
+  authorKind?: "ai" | "agent";
+  /** Nome do atendente, quando houver. Sai de `profiles.display_name`. */
+  authorName?: string | null;
 }
 
 /**

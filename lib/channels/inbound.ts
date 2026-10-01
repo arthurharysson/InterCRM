@@ -1,5 +1,6 @@
 import { ingestSocialInbound, socialPayloadBelongsToSession } from "./social/ingest";
-import { CHANNEL_PROVIDER_SOCIAL } from "./capabilities";
+import { CHANNEL_PROVIDER_SOCIAL, CHANNEL_PROVIDER_WEB } from "./capabilities";
+import { ingestWebInbound, parseWebPayload, verifyWebSignature } from "./web/ingest";
 /**
  * Entrada de webhook, do lado de dentro do seam.
  *
@@ -86,6 +87,7 @@ export function acceptsInboundWebhook(provider: string): boolean {
   // O canal Datafy é opcional da instalação: desligado, a entrada dele não
   // existe — nem para quem tem o token de uma sessão gravada antes.
   if (provider === CHANNEL_PROVIDER_DATAFY) return canalGraphParceiroLigado();
+  if (provider === CHANNEL_PROVIDER_WEB) return Boolean(process.env.INTERSUITE_HMAC_SECRET_OUT);
   return provider === CHANNEL_PROVIDER_ZERNIO || provider === CHANNEL_PROVIDER_SOCIAL;
 }
 
@@ -95,6 +97,9 @@ export function verifyInboundWebhookSignature(provider: string, raw: string, hea
   // Cada canal assina do seu jeito; o esquema do Datafy está em `graph-parceiro/webhook`.
   if (provider === CHANNEL_PROVIDER_DATAFY) {
     return verifyGraphPartnerSignature(raw, headers.get(HEADER_ASSINATURA), headers.get(HEADER_TIMESTAMP), secret);
+  }
+  if (provider === CHANNEL_PROVIDER_WEB) {
+    return verifyWebSignature(raw, headers.get("x-intersuite-signature"), secret);
   }
   return verifyZernioSignature(raw, headers.get("x-zernio-signature"), secret);
 }
@@ -194,6 +199,8 @@ export async function handleInboundWebhook(
       return zernioInbound(admin, input);
     case CHANNEL_PROVIDER_DATAFY:
       return datafyInbound(admin, input);
+    case CHANNEL_PROVIDER_WEB:
+      return webInbound(admin, input);
     default:
       // Token de um canal que não entra por aqui. É configuração trocada, não
       // ataque — mas processar seria ler o payload com o parser errado.
@@ -439,4 +446,30 @@ async function datafyInbound(
   }
 
   return { ok: true, body: { received: eventos.length, outcomes: desfechos } };
+}
+
+async function webInbound(
+  admin: SupabaseClient,
+  input: InboundWebhookInput,
+): Promise<InboundWebhookOutcome> {
+  const secret = process.env.INTERSUITE_HMAC_SECRET_OUT;
+  if (!secret || secret.length < MIN_SECRET_LEN) {
+    return { ok: false, code: "unauthorized", message: "webhook_secret_unavailable" };
+  }
+
+  if (!verifyWebSignature(input.rawBody, input.headers.get("x-intersuite-signature"), secret)) {
+    return { ok: false, code: "unauthorized", message: "bad_signature" };
+  }
+
+  const payload = parseWebPayload(input.rawBody);
+  if (!payload) {
+    return { ok: false, code: "invalid_json", message: "invalid_json" };
+  }
+
+  const r = await ingestWebInbound(admin, {
+    organizationId: input.session.organization_id,
+    channelSessionId: input.session.id,
+    payload,
+  });
+  return { ok: true, body: { ...r } };
 }

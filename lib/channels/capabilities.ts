@@ -110,6 +110,19 @@ export const CHANNEL_CAPABILITIES: Record<ProviderDeMensagem, ChannelCapabilitie
     costPerMessage: true,
     alteraMensagemEnviada: false,
   },
+  // Sem plataforma por trás: o transporte é o InterSuite, e quem entrega é o
+  // SSE dele. Nenhuma das restrições dos outros canais se aplica.
+  web: {
+    freeformOutsideWindow: true,
+    requiresTemplates: false,
+    canManageTemplates: false,
+    banRisk: false,
+    minIntervalMs: null,
+    voiceNote: "server-convert",
+    groups: "none",
+    costPerMessage: false,
+    alteraMensagemEnviada: false,
+  },
 };
 
 /**
@@ -136,6 +149,8 @@ export const CHANNEL_PROVIDER_ZERNIO: ChannelProvider = "zernio";
 export const CHANNEL_PROVIDER_DATAFY: ChannelProvider = "datafy";
 /** Chamada de voz WhatsApp (spec 18). Não transporta mensagem — ver abaixo. */
 export const CHANNEL_PROVIDER_WACALLS: ChannelProvider = "wacalls";
+/** Chat web — o transporte é o próprio InterSuite, não há provider externo. */
+export const CHANNEL_PROVIDER_WEB: ChannelProvider = "web";
 
 /**
  * Os providers por onde MENSAGEM entra e sai — a única lista que responde
@@ -158,6 +173,7 @@ export const PROVIDERS_DE_MENSAGEM = [
   "zernio",
   "zernio_social",
   "datafy",
+  "web",
 ] as const satisfies readonly ProviderDeMensagem[];
 
 /**

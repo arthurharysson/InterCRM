@@ -45418,3 +45418,43 @@ comment on column public.ai_agent_versions.inbound_debounce_ms is
 alter table public.ai_agent_versions
   add constraint ai_agent_versions_inbound_debounce_ms_check
   check (inbound_debounce_ms is null or (inbound_debounce_ms >= 0 and inbound_debounce_ms <= 60000));
+
+-- ---- canal web — InterSuite (migration 0501) ----
+-- Coluna discriminadora para sessões do canal `web`.
+alter table public.channel_sessions
+  add column if not exists web_widget_id text;
+
+create unique index if not exists channel_sessions_web_widget_id_ativo_unique
+  on public.channel_sessions (organization_id, web_widget_id)
+  where web_widget_id is not null and archived_at is null;
+
+-- Provider CHECK: par drop/add para o update.sh reaplicar sem 'already exists'.
+alter table public.channel_sessions
+  drop constraint if exists channel_sessions_provider_check;
+alter table public.channel_sessions
+  add constraint channel_sessions_provider_check
+  check (provider = any (array[
+    'waha'::text, 'meta_cloud'::text, 'zernio'::text,
+    'wacalls'::text, 'zernio_social'::text, 'datafy'::text,
+    'web'::text
+  ]));
+
+-- Provider-ref CHECK: garante que cada provider tem sua coluna discriminadora.
+alter table public.channel_sessions
+  drop constraint if exists channel_sessions_provider_ref_check;
+alter table public.channel_sessions
+  add constraint channel_sessions_provider_ref_check check (
+    (provider = 'waha'       and waha_session_name      is not null) or
+    (provider = 'meta_cloud' and meta_phone_number_id    is not null) or
+    (provider in ('zernio', 'zernio_social') and zernio_account_id is not null) or
+    (provider = 'wacalls'    and wacalls_session_id      is not null) or
+    (provider = 'datafy'     and datafy_phone_number_id  is not null) or
+    (provider = 'web'        and web_widget_id           is not null)
+  );
+
+-- Canal de conversa CHECK: par drop/add.
+alter table public.conversations
+  drop constraint if exists conversations_channel_check;
+alter table public.conversations
+  add constraint conversations_channel_check
+  check (channel in ('whatsapp', 'instagram', 'facebook', 'web'));

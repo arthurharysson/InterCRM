@@ -1035,6 +1035,10 @@ export async function sendMessageHandler(
           kind: input.type,
           body: input.body ?? "",
           replyToExternalId: citada?.external_id ?? null,
+          conversationId: c.id,
+          messageId: message.id,
+          authorKind: origemDaMensagem(ctx.actor) === "ai" ? "ai" : "agent",
+          authorName: ctx.onBehalfOf?.userName ?? null,
         }));
       }
 
