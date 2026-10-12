@@ -93,13 +93,16 @@ export function acceptsInboundWebhook(provider: string): boolean {
 
 /** Authenticate before archiving raw payloads. The handler repeats this guard for non-HTTP callers. */
 export function verifyInboundWebhookSignature(provider: string, raw: string, headers: Headers, secret: string | null): boolean {
-  if (!acceptsInboundWebhook(provider) || !secret || secret.length < MIN_SECRET_LEN) return false;
+  if (!acceptsInboundWebhook(provider)) return false;
+  if (provider === CHANNEL_PROVIDER_WEB) {
+    const webSecret = process.env.INTERSUITE_HMAC_SECRET_OUT;
+    if (!webSecret || webSecret.length < MIN_SECRET_LEN) return false;
+    return verifyWebSignature(raw, headers.get("x-deskcomm-signature"), webSecret);
+  }
+  if (!secret || secret.length < MIN_SECRET_LEN) return false;
   // Cada canal assina do seu jeito; o esquema do Datafy está em `graph-parceiro/webhook`.
   if (provider === CHANNEL_PROVIDER_DATAFY) {
     return verifyGraphPartnerSignature(raw, headers.get(HEADER_ASSINATURA), headers.get(HEADER_TIMESTAMP), secret);
-  }
-  if (provider === CHANNEL_PROVIDER_WEB) {
-    return verifyWebSignature(raw, headers.get("x-intersuite-signature"), secret);
   }
   return verifyZernioSignature(raw, headers.get("x-zernio-signature"), secret);
 }
