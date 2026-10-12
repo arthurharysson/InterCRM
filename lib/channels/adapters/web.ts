@@ -63,7 +63,7 @@ export const webAdapter: ChannelAdapter = {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "X-Crm-Signature": assinatura,
+        "X-Deskcomm-Signature": assinatura,
       },
       body: corpo,
     });

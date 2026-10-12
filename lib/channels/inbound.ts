@@ -457,7 +457,7 @@ async function webInbound(
     return { ok: false, code: "unauthorized", message: "webhook_secret_unavailable" };
   }
 
-  if (!verifyWebSignature(input.rawBody, input.headers.get("x-intersuite-signature"), secret)) {
+  if (!verifyWebSignature(input.rawBody, input.headers.get("x-deskcomm-signature"), secret)) {
     return { ok: false, code: "unauthorized", message: "bad_signature" };
   }
 
