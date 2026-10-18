@@ -81,6 +81,7 @@ export interface VoiceCallRow {
   end_reason: string | null;
   started_at: string;
   answered_at: string | null;
+  provider?: string | null;
   /** Quem está NA LINHA. `null` numa chamada recebida que ninguém atendeu. */
   owner_user_id?: string | null;
   /** Quem discou pelo CRM. `null` em toda ligação recebida. */
@@ -428,6 +429,7 @@ export function useVoiceCallSession(remoteAudioRef: RefObject<HTMLAudioElement |
     }
     const row = (payload as { new?: VoiceCallRow } | null)?.new;
     if (!row?.id) return;
+    if (row.provider === "fluxo") return;
     if (row.status === "ended") encerradasRef.current.add(row.id);
     else if (encerradasRef.current.has(row.id)) return;
     setCall((atual) => {
