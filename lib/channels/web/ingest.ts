@@ -49,7 +49,8 @@ export function parseWebPayload(raw: string): WebInboundPayload | null {
     text: o.text,
     sent_at: typeof o.sent_at === "string" ? o.sent_at : undefined,
     message_id: typeof o.message_id === "string" ? o.message_id : undefined,
-    sender_name: typeof o.sender_name === "string" ? o.sender_name : undefined,
+    sender_name: typeof o.sender_name === "string" ? o.sender_name
+      : typeof o.display_name === "string" ? o.display_name : undefined,
   };
 }
 
