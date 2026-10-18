@@ -1050,6 +1050,15 @@ export const NAV_CATALOG = [
     minRole: "admin",
   },
   {
+    href: "/app/settings/webphone",
+    label: "Telefone no navegador",
+    description: "Ramais da central telefônica para ligar e atender pelo CRM.",
+    icon: "Phone",
+    group: "organizacao",
+    section: "Sua empresa",
+    minRole: "admin",
+  },
+  {
     href: "/app/settings/voip-trunk",
     label: "Trunk SIP",
     description: "Credenciais do provedor SIP para chamadas de voz por IA.",
