@@ -32499,7 +32499,7 @@ alter table public.voice_calls
 alter table public.voice_calls drop constraint if exists voice_calls_provider_check;
 alter table public.voice_calls
   add constraint voice_calls_provider_check
-  check (provider = any (array['wacalls', 'sip', 'fluxo']));
+  check (provider = any (array['wacalls', 'sip']));
 
 alter table public.voice_calls drop constraint if exists voice_calls_handled_by_check;
 alter table public.voice_calls
