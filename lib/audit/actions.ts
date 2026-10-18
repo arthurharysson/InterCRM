@@ -733,6 +733,7 @@ export const AUDIT_ACTIONS = [
   // Só o CREATE é auditado aqui — status/transcript são atualizados pelo
   // worker via admin client, fora do caminho de sessão que este audit cobre.
   "call.created",
+  "call.hangup",
   "voip_trunk.created",
   "voip_trunk.updated",
 
