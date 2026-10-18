@@ -40,6 +40,7 @@ import { rotuloDoContato } from "@/lib/contacts/rotulo-do-contato";
 import { origemDoContato } from "@/lib/leads/origem-do-contato";
 import { phoneForDisplay } from "@/lib/channels/phone-variants";
 import { DialButton } from "@/components/voice/DialButton";
+import { FluxoDialButton } from "@/components/voice/FluxoDialButton";
 
 interface Props {
   contactId: string;
@@ -214,6 +215,7 @@ export function ContactDetailClient({ contactId }: Props) {
               </AlertDialog>
             )}
             <DialButton contactId={contactId} hasPhone={!!contact.phone_number} />
+            <FluxoDialButton phoneNumber={contact.phone_number ?? ""} contactId={contactId} />
             <Button variant="outline" onClick={() => setEditOpen(true)} className="shrink-0">
               <PencilSimple size={16} weight="bold" aria-hidden />
               <span>{t("Editar")}</span>
