@@ -77,6 +77,27 @@ export interface MidiaDaChamada {
   energiaRecebida?: number | null;
   /** O elemento de áudio do navegador está de fato tocando o que chega. */
   elementoTocando?: boolean | null;
+  /**
+   * Diagnóstico fino, só para o "Detalhes do áudio". Separa "a central manda silêncio"
+   * de "o navegador recebe e não decodifica ou não toca": o contador de pacotes sozinho
+   * não distingue as duas coisas.
+   */
+  /** Nome do microfone que o navegador está de fato usando (o que o sistema escolheu, não o que a pessoa imaginou). */
+  microfone?: string | null;
+  /** Energia sonora que o microfone captou. Zero com a pessoa falando = o microfone certo não está sendo lido. */
+  energiaEnviada?: number | null;
+  /** O formato do áudio que chega (ex.: `audio/PCMU`). */
+  codec?: string | null;
+  /** Amostras de áudio que o navegador decodificou do que chegou. Parado em zero = nada decodificável chega. */
+  amostrasRecebidas?: number | null;
+  /** Amostras que o navegador teve de inventar por falta de áudio. Igual às recebidas = tudo foi preenchimento. */
+  amostrasOcultas?: number | null;
+  /** Bytes de áudio que chegaram. Dividido pelos pacotes diz o tamanho de cada um. */
+  bytesRecebidos?: number | null;
+  /** A trilha do som que chega está marcada como sem sinal pelo navegador. */
+  trilhaSemSinal?: boolean | null;
+  /** Estado cru do elemento de áudio: pausado ou não, e o `readyState` (0 a 4). */
+  elemento?: string | null;
 }
 
 export interface ChamadaAtual {
@@ -150,6 +171,8 @@ export class Webphone implements Telefone {
   private idDaLigacao: string | null = null;
   private iniciadaEm = 0;
   private numeroPedido: string | null = null;
+  /** Nome do erro do último `play()` recusado — só diagnóstico, aparece em "Detalhes do áudio". */
+  private erroAoTocar: string | null = null;
   private estado: InstantaneoDoWebphone = { registro: "conectando", chamada: null, fechamento: null, microfoneNegado: false };
 
   constructor(
@@ -288,6 +311,42 @@ export class Webphone implements Telefone {
 
   // ── o fechamento ─────────────────────────────────────────────────────────
 
+  /**
+   * Liga ao elemento de áudio o som que a conexão realmente recebe — sem depender do
+   * evento `track`, que numa ligação de SAÍDA pode passar sem que o elemento chegue a
+   * tocar (medido: pacotes de voz chegando, elemento pausado em `readyState 0`, zero
+   * amostras decodificadas — o navegador só decodifica o que está sendo reproduzido).
+   * Idempotente: roda no atendimento e a cada medida, e só mexe no que está errado.
+   */
+  private garantirSomRemoto(conexao: RTCPeerConnection | undefined): void {
+    if (!conexao || typeof conexao.getReceivers !== "function") return;
+    const faixas = conexao
+      .getReceivers()
+      .map((r) => r.track)
+      .filter((f) => f.kind === "audio");
+    if (faixas.length === 0) return;
+    const atual = this.audio.srcObject instanceof MediaStream ? this.audio.srcObject : null;
+    const jaLigado = atual !== null && faixas.every((f) => atual.getAudioTracks().includes(f));
+    if (!jaLigado) this.audio.srcObject = new MediaStream(faixas);
+    this.audio.muted = false;
+    this.audio.volume = 1;
+    if (this.audio.paused) {
+      void this.audio.play().then(
+        () => {
+          this.erroAoTocar = null;
+        },
+        (erro: unknown) => {
+          this.erroAoTocar = erro instanceof Error ? erro.name : "erro";
+          // Recusa por política de reprodução: o painel oferece "Ativar o som", cujo clique é o gesto que faltava.
+          if (this.erroAoTocar === "NotAllowedError") {
+            const aberta = this.estado.chamada;
+            if (aberta) this.atualizarChamada({ midia: { ...aberta.midia, somBloqueado: true } });
+          }
+        },
+      );
+    }
+  }
+
   /** Tenta tocar de novo o som que chega. O clique que chama isto é o gesto que o navegador exigia. */
   ativarSom(): void {
     this.audio.muted = false;
@@ -334,6 +393,7 @@ export class Webphone implements Telefone {
     this.numeroPedido = null;
 
     this.sessao = sessao;
+    this.erroAoTocar = null;
     // `randomId()` e não o gerador cru do navegador: este some em página sem HTTPS (uma VPS por IP), e a ligação nem começaria.
     this.idDaLigacao = randomId();
     this.iniciadaEm = Date.now();
@@ -376,6 +436,7 @@ export class Webphone implements Telefone {
     const atendida = () => {
       if (this.estado.chamada?.estado === "em_andamento") return;
       this.atualizarChamada({ estado: "em_andamento", atendidaEm: Date.now() });
+      this.garantirSomRemoto(sessao.connection as unknown as RTCPeerConnection | undefined);
       this.iniciarMedicao(sessao);
     };
     sessao.on("accepted", atendida);
@@ -458,6 +519,12 @@ export class Webphone implements Telefone {
           let enviados = 0;
           let energia = 0;
           let jitter = 0;
+          let energiaEnviada = 0;
+          let amostras = 0;
+          let ocultas = 0;
+          let bytes = 0;
+          let codecId: string | undefined;
+          const codecs = new Map<string, string>();
           const candidatos = new Map<string, string>();
           const pares: Array<{ local?: string; remoto?: string; escolhido: boolean }> = [];
           relatorio.forEach((r) => {
@@ -476,7 +543,16 @@ export class Webphone implements Telefone {
               state?: string;
               nominated?: boolean;
               selected?: boolean;
+              mimeType?: string;
+              codecId?: string;
+              bytesReceived?: number;
+              totalSamplesReceived?: number;
+              concealedSamples?: number;
             };
+            if (s.type === "codec") {
+              if (s.id && s.mimeType) codecs.set(s.id, s.mimeType);
+              return;
+            }
             if (s.type === "local-candidate" || s.type === "remote-candidate") {
               if (s.id && s.candidateType) candidatos.set(s.id, s.candidateType);
               return;
@@ -495,10 +571,28 @@ export class Webphone implements Telefone {
               recebidos += s.packetsReceived ?? 0;
               energia += s.totalAudioEnergy ?? 0;
               jitter = Math.max(jitter, s.jitter ?? 0);
+              amostras += s.totalSamplesReceived ?? 0;
+              ocultas += s.concealedSamples ?? 0;
+              bytes += s.bytesReceived ?? 0;
+              codecId = s.codecId ?? codecId;
             } else if (s.type === "outbound-rtp") {
               enviados += s.packetsSent ?? 0;
+            } else if (s.type === "media-source") {
+              // O que o MICROFONE captou, antes de virar pacote.
+              energiaEnviada += s.totalAudioEnergy ?? 0;
             }
           });
+
+          // Quem é o microfone e se a trilha que chega tem sinal — perguntado à conexão, não suposto.
+          const conexaoViva = sessao.connection as unknown as RTCPeerConnection | undefined;
+          const microfone =
+            conexaoViva
+              ?.getSenders()
+              .find((e) => e.track?.kind === "audio")
+              ?.track?.label?.trim() || null;
+          const trilhaQueChega = conexaoViva?.getReceivers().find((r) => r.track.kind === "audio")?.track;
+          // O elemento pode não ter sido ligado (evento perdido) ou ter ficado parado: corrige a cada medida.
+          this.garantirSomRemoto(conexaoViva);
 
           // O que o navegador mediu sobre o caminho do som, dito sem rodeio:
           // se NADA chegou ou NADA saiu depois de uns segundos de conversa, o
@@ -519,8 +613,19 @@ export class Webphone implements Telefone {
               caminho,
               energiaRecebida: energia,
               elementoTocando: !this.audio.paused && this.audio.readyState >= 2 && this.audio.srcObject !== null,
+              microfone,
+              energiaEnviada,
+              codec: codecId ? (codecs.get(codecId) ?? null) : null,
+              amostrasRecebidas: amostras,
+              amostrasOcultas: ocultas,
+              bytesRecebidos: bytes,
+              trilhaSemSinal: trilhaQueChega ? trilhaQueChega.muted : null,
+              elemento: `${this.audio.paused ? "pausado" : "ativo"} · readyState ${this.audio.readyState} · ${this.audio.srcObject ? "com fluxo" : "sem fluxo"}${this.erroAoTocar ? ` · erro ${this.erroAoTocar}` : ""}`,
             };
             const mudou =
+              midia.amostrasRecebidas !== atual.midia.amostrasRecebidas ||
+              midia.microfone !== atual.midia.microfone ||
+              midia.elemento !== atual.midia.elemento ||
               midia.recebendo !== atual.midia.recebendo ||
               midia.enviando !== atual.midia.enviando ||
               midia.pacotesRecebidos !== atual.midia.pacotesRecebidos ||

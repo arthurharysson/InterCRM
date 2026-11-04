@@ -16509,6 +16509,14 @@ export const DICIONARIO: Traducoes = {
   "Reprodução": { es: "Reproducción" },
   "tocando": { es: "reproduciendo" },
   "parada": { es: "detenida" },
+  "Microfone em uso": { es: "Micrófono en uso" },
+  "Som captado pelo microfone": { es: "Sonido captado por el micrófono" },
+  "Formato do áudio": { es: "Formato del audio" },
+  "Amostras decodificadas": { es: "Muestras decodificadas" },
+  "Amostras inventadas": { es: "Muestras inventadas" },
+  "Bytes recebidos": { es: "Bytes recibidos" },
+  "Trilha sem sinal": { es: "Pista sin señal" },
+  "Elemento de áudio": { es: "Elemento de audio" },
 };
 
 /**
