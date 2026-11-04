@@ -50,6 +50,9 @@ import { rotuloDoContato } from "@/lib/contacts/rotulo-do-contato";
 import { origemDoContato } from "@/lib/leads/origem-do-contato";
 import { phoneForDisplay } from "@/lib/channels/phone-variants";
 import { DialButton } from "@/components/voice/DialButton";
+import { useWebphone } from "@/components/webphone/contexto";
+import { HistoricoDeLigacoes } from "@/components/webphone/HistoricoDeLigacoes";
+import { LigarPeloTelefone } from "@/components/webphone/LigarPeloTelefone";
 
 interface Props {
   contactId: string;
@@ -79,6 +82,7 @@ export function ContactDetailClient({ contactId, paineisDeModulo = [] }: Props) 
   const localeDaData = useLocaleDeData();
   const t = useT();
   const q = useContact(contactId);
+  const webphone = useWebphone();
   const { user, activeOrg } = useAuth();
   const clientesLigado = activeOrg?.cliente_pela_agenda === true;
   // As DEFINIÇÕES continuam no funil (`crm_pipelines.settings.fields[]`) — só o
@@ -342,6 +346,7 @@ export function ContactDetailClient({ contactId, paineisDeModulo = [] }: Props) 
                 </span>
               </Button>
             )}
+            <LigarPeloTelefone numero={contact.phone_number} />
             <DialButton contactId={contactId} hasPhone={!!contact.phone_number} />
             <Button variant="outline" onClick={() => setEditOpen(true)} className="shrink-0">
               <PencilSimple size={16} weight="bold" aria-hidden />
@@ -369,6 +374,7 @@ export function ContactDetailClient({ contactId, paineisDeModulo = [] }: Props) 
         <TabsList>
           <TabsTrigger value="overview">{t("Visão geral")}</TabsTrigger>
           <TabsTrigger value="timeline">Timeline</TabsTrigger>
+          {webphone.disponivel && <TabsTrigger value="ligacoes">{t("Ligações")}</TabsTrigger>}
           {isAdmin && <TabsTrigger value="lgpd">LGPD</TabsTrigger>}
         </TabsList>
 
@@ -513,6 +519,12 @@ export function ContactDetailClient({ contactId, paineisDeModulo = [] }: Props) 
         <TabsContent value="timeline" className="mt-4">
           <TimelineView contactId={contactId} />
         </TabsContent>
+
+        {webphone.disponivel && (
+          <TabsContent value="ligacoes" className="mt-4">
+            <HistoricoDeLigacoes contactId={contactId} />
+          </TabsContent>
+        )}
 
         {isAdmin && (
           <TabsContent value="lgpd" className="mt-4">
