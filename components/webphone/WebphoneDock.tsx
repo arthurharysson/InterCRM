@@ -368,6 +368,22 @@ export function WebphoneDock() {
               <dd>
                 {chamada.midia.elementoTocando == null ? "—" : chamada.midia.elementoTocando ? t("tocando") : t("parada")}
               </dd>
+              <dt>{t("Microfone em uso")}</dt>
+              <dd className="break-words">{chamada.midia.microfone ?? "—"}</dd>
+              <dt>{t("Som captado pelo microfone")}</dt>
+              <dd>{chamada.midia.energiaEnviada != null ? chamada.midia.energiaEnviada.toFixed(4) : "—"}</dd>
+              <dt>{t("Formato do áudio")}</dt>
+              <dd>{chamada.midia.codec ?? "—"}</dd>
+              <dt>{t("Amostras decodificadas")}</dt>
+              <dd>{chamada.midia.amostrasRecebidas ?? "—"}</dd>
+              <dt>{t("Amostras inventadas")}</dt>
+              <dd>{chamada.midia.amostrasOcultas ?? "—"}</dd>
+              <dt>{t("Bytes recebidos")}</dt>
+              <dd>{chamada.midia.bytesRecebidos ?? "—"}</dd>
+              <dt>{t("Trilha sem sinal")}</dt>
+              <dd>{chamada.midia.trilhaSemSinal == null ? "—" : chamada.midia.trilhaSemSinal ? t("Sim") : t("Não")}</dd>
+              <dt>{t("Elemento de áudio")}</dt>
+              <dd>{chamada.midia.elemento ?? "—"}</dd>
             </dl>
           </details>
         ) : null}
