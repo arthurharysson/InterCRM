@@ -774,6 +774,14 @@ export const AUDIT_ACTIONS = [
   "call.created",
   "voip_trunk.created",
   "voip_trunk.updated",
+  // Webphone no navegador (migration 8801). A senha SIP nunca vai no metadata.
+  "webphone.settings_updated",
+  "webphone.ramal_saved",
+  "webphone.ramal_removed",
+  "webphone.call_logged",
+  "webphone.call_outcome_set",
+  "webphone.click_to_call",
+  "webphone.click_to_call_hangup",
 
   // Chamada de voz WhatsApp (spec 18, migration 0234). Ligá-la vincula um
   // SEGUNDO aparelho ao número que já atende, por um caminho que não é o

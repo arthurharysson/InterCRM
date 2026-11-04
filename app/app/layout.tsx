@@ -29,6 +29,7 @@ import { logger } from "@/lib/logger";
 import { IdiomaProvider } from "@/lib/i18n/IdiomaProvider";
 import { listarConexoesCaidas, type ConexaoCaida } from "@/lib/channels/health";
 import { VoiceCallProvider } from "@/components/voice/VoiceCallContext";
+import { WebphoneProvider } from "@/components/webphone/WebphoneProvider";
 import { ProvedorDaOcupacaoDoRodape } from "@/lib/ui/rodape-ocupado";
 import { acessoFoiRevogado } from "@/lib/auth/vinculo-revogado";
 
@@ -273,12 +274,14 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const shell = (
     <ProvedorDaOcupacaoDoRodape>
       <VoiceCallProvider>
-        <AppShell
-          sidebarCollapsed={collapsed}
-          podeAtender={Boolean(activeOrg && roleAtLeast(activeOrg.role, "agent"))}
-        >
-          {children}
-        </AppShell>
+        <WebphoneProvider>
+          <AppShell
+            sidebarCollapsed={collapsed}
+            podeAtender={Boolean(activeOrg && roleAtLeast(activeOrg.role, "agent"))}
+          >
+            {children}
+          </AppShell>
+        </WebphoneProvider>
       </VoiceCallProvider>
     </ProvedorDaOcupacaoDoRodape>
   );
