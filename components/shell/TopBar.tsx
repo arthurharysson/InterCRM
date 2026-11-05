@@ -1,4 +1,5 @@
 "use client";
+import { ID_DO_ENCAIXE_DA_CONEXAO_CAIDA } from "@/components/app/ConexaoCaidaBanner";
 import { AlertsBell } from "./AlertsBell";
 import { AvisoDePropostaEmDestaque } from "./AvisoDePropostaEmDestaque";
 import { MobileSidebar } from "./MobileSidebar";
@@ -27,6 +28,10 @@ export function TopBar() {
           <SearchTrigger />
         </div>
         <div className="flex shrink-0 items-center gap-2">
+          {/* O ENCAIXE do aviso de WhatsApp desconectado (`ConexaoCaidaBanner`):
+              o chip aparece aqui, no lugar de uma faixa que tomava a altura da tela.
+              Vazio, não ocupa nada (`empty:hidden`). */}
+          <div id={ID_DO_ENCAIXE_DA_CONEXAO_CAIDA} className="flex min-w-0 items-center empty:hidden" />
           <AlertsBell />
           <AvisoDePropostaEmDestaque />
           <UserMenu />
