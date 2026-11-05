@@ -1013,11 +1013,14 @@ export function InboxLayout({
         data-teclado-aberto={tecladoAberto ? "" : undefined}
         className={cn(
           "h-full min-h-0 min-w-0 flex-col md:flex group/conversa md:overflow-hidden md:rounded-2xl md:border md:border-border md:bg-card md:shadow-sm",
-          // O ramal fixo cobre o canto de baixo à direita: a conversa só cede altura
-          // a ele quando é a última coluna (sem ficha ao lado, ou com a ficha em trilho).
+          // O ramal (FAB de 48px no canto de baixo à direita) não reserva rodapé em
+          // repouso. Onde a conversa é a última coluna e o botão cairia em cima do
+          // "enviar" (entre md e xl, sem ficha ao lado), ela deixa 3.5rem livres;
+          // num painel de chamada aberto, a reserva declarada (`--rodape-ocupado`) manda.
+          // Em xl com a ficha em trilho, o FAB cai sobre o trilho e não toca o chat.
           painelRecolhido
-            ? "md:max-h-[calc(100%_-_max(0px,var(--rodape-ocupado,0px)_-_0.5rem))]"
-            : "md:max-xl:max-h-[calc(100%_-_max(0px,var(--rodape-ocupado,0px)_-_0.5rem))]",
+            ? "md:max-xl:max-h-[calc(100%_-_max(3.5rem,var(--rodape-ocupado,0px)_-_0.5rem))] xl:max-h-[calc(100%_-_max(0px,var(--rodape-ocupado,0px)_-_0.5rem))]"
+            : "md:max-xl:max-h-[calc(100%_-_max(3.5rem,var(--rodape-ocupado,0px)_-_0.5rem))]",
           colunas.conversa,
         )}
       >

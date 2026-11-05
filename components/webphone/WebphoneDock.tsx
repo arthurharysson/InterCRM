@@ -3,10 +3,11 @@
  * O TELEFONE NA TELA — status do ramal, teclado, chamada recebida, controles e
  * o fechamento da ligação.
  *
- * Fixo no canto inferior direito, como o painel de chamada de voz do WhatsApp, e
- * declarando o que ocupa para a casca descontar (contrato do rodapé,
- * `lib/ui/rodape-ocupado.tsx`). UM painel só, que muda de estado: repouso →
- * tocando → em conversa → fechamento. Quem desenha é só a tela: toda decisão de
+ * No canto inferior direito. Em repouso é um FAB (botão redondo) que flutua sobre
+ * o conteúdo e NÃO reserva rodapé; chamada recebida, em andamento e fechamento
+ * são painéis fixos que declaram o que ocupam para a casca descontar (contrato
+ * do rodapé, `lib/ui/rodape-ocupado.tsx`). Um telefone só, que muda de estado:
+ * repouso → tocando → em conversa → fechamento. Quem desenha é só a tela: toda decisão de
  * telefone mora no motor (`lib/webphone/motor.ts`).
  */
 import { useQuery } from "@tanstack/react-query";
@@ -39,6 +40,21 @@ export const PECA_DO_WEBPHONE: PecaDoRodape = {
   distancia: 16,
   altura: 48,
 };
+
+/**
+ * O painel FIXO do telefone (chamada recebida, em andamento, fechamento): é ele —
+ * e só ele — que declara o que ocupa no rodapé. O botão de repouso é um FAB e
+ * flutua por cima do conteúdo, sem reservar faixa nenhuma. Como o registro nasce
+ * e morre com este componente, a reserva existe enquanto o painel está na tela.
+ */
+function CaixaFixa({ className, children, ...resto }: React.ComponentProps<"div">) {
+  const ancora = usePecaDoRodape(PECA_DO_WEBPHONE);
+  return (
+    <div ref={ancora} className={className} {...resto}>
+      {children}
+    </div>
+  );
+}
 
 const TECLAS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "*", "0", "#"] as const;
 
@@ -108,7 +124,6 @@ function Cronometro({ desde }: { desde: number }) {
 export function WebphoneDock() {
   const t = useT();
   const wp = useWebphone();
-  const ancora = usePecaDoRodape(PECA_DO_WEBPHONE);
 
   const [aberto, setAberto] = useState(false);
   const [digitado, setDigitado] = useState("");
@@ -170,8 +185,7 @@ export function WebphoneDock() {
   // ── chamada recebida ──────────────────────────────────────────────────────
   if (chamada && tocando) {
     return (
-      <div
-        ref={ancora}
+      <CaixaFixa
         role="alertdialog"
         aria-label={t("Chamada recebida")}
         className="fixed bottom-4 right-4 z-50 flex w-80 flex-col gap-3 rounded-lg border bg-background p-4 shadow-lg"
@@ -200,15 +214,14 @@ export function WebphoneDock() {
             {t("Recusar")}
           </Button>
         </div>
-      </div>
+      </CaixaFixa>
     );
   }
 
   // ── chamada em andamento ──────────────────────────────────────────────────
   if (chamada) {
     return (
-      <div
-        ref={ancora}
+      <CaixaFixa
         className="fixed bottom-4 right-4 z-50 flex w-80 flex-col gap-3 rounded-lg border bg-background p-4 shadow-lg"
       >
         <div className="flex items-center gap-3">
@@ -404,7 +417,7 @@ export function WebphoneDock() {
             </span>
           </p>
         ) : null}
-      </div>
+      </CaixaFixa>
     );
   }
 
@@ -416,8 +429,7 @@ export function WebphoneDock() {
         ? t("Ligação encerrada")
         : t("A ligação não completou");
     return (
-      <div
-        ref={ancora}
+      <CaixaFixa
         role="dialog"
         aria-label={titulo}
         className="fixed bottom-4 right-4 z-50 flex w-80 flex-col gap-3 rounded-lg border bg-background p-4 shadow-lg"
@@ -484,13 +496,14 @@ export function WebphoneDock() {
             {fechamento.perdida ? t("Ligar de volta") : t("Ligar de novo")}
           </Button>
         ) : null}
-      </div>
+      </CaixaFixa>
     );
   }
 
-  // ── em repouso: a pílula e, aberto, o teclado de discagem ─────────────────
+  // ── em repouso: o FAB e, aberto, o teclado de discagem ────────────────────
+  // Flutua por cima do conteúdo e NÃO reserva rodapé (não passa por `CaixaFixa`).
   return (
-    <div ref={ancora} className="fixed bottom-4 right-4 z-50 flex flex-col items-end gap-2">
+    <div className="fixed bottom-4 right-4 z-50 flex flex-col items-end gap-2">
       {aberto ? (
         <div className="flex w-72 flex-col gap-3 rounded-lg border bg-background p-3 shadow-lg">
           <Input
@@ -528,16 +541,23 @@ export function WebphoneDock() {
           ) : null}
         </div>
       ) : null}
+      {/* O FAB: um círculo com o fone e a bolinha do estado do ramal. O rótulo
+          ("Ramal conectado"…) vai no `title` e para o leitor de tela, não ocupa a tela. */}
       <Button
         variant="outline"
-        className="h-12 gap-2 rounded-full bg-background px-4 shadow-md"
+        size="icon"
+        className="relative h-12 w-12 rounded-full bg-background shadow-lg lg:h-12 lg:w-12"
         aria-expanded={aberto}
         aria-label={t("Abrir o telefone")}
+        title={rotuloDoRegistro}
         onClick={() => setAberto((v) => !v)}
       >
-        <span className={`size-2.5 rounded-full ${corDoRegistro}`} aria-hidden />
-        <Phone size={16} weight="bold" aria-hidden />
-        <span className="text-sm">{rotuloDoRegistro}</span>
+        <Phone size={20} weight="bold" aria-hidden />
+        <span
+          className={`absolute top-0.5 right-0.5 size-3 rounded-full ring-2 ring-background ${corDoRegistro}`}
+          aria-hidden
+        />
+        <span className="sr-only">{rotuloDoRegistro}</span>
       </Button>
     </div>
   );
