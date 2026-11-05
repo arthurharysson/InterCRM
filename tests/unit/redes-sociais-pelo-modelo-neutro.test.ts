@@ -132,7 +132,8 @@ describe("CONTROLE: os canais que já existiam continuam declarados", () => {
   });
 
   it("o vocabulário de canal da conversa não mudou", () => {
-    expect([...CANAIS_DE_CONVERSA]).toEqual(["whatsapp", "instagram", "facebook"]);
+    // 'web' é o canal do fork (chat do InterSuite); os três do upstream seguem na frente, na mesma ordem.
+    expect([...CANAIS_DE_CONVERSA]).toEqual(["whatsapp", "instagram", "facebook", "web"]);
   });
 
   it("a matriz de capabilities segue respondendo por todos os canais de mensagem", () => {
@@ -142,6 +143,7 @@ describe("CONTROLE: os canais que já existiam continuam declarados", () => {
       "zernio",
       "zernio_social",
       "datafy",
+      "web", // canal do fork (InterSuite); os cinco do upstream seguem na frente
     ]);
     for (const provider of PROVIDERS_DE_MENSAGEM) {
       const caps = capabilitiesOf(provider);

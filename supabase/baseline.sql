@@ -9604,14 +9604,24 @@ alter table public.channel_sessions
   add column if not exists datafy_waba_id text,
   add column if not exists datafy_token_encrypted bytea;
 
+-- canal web — InterSuite (migration 8804): coluna discriminadora do provider 'web', nullable e
+-- antes das constraints que a referenciam. O índice único é parcial: canal arquivado só
+-- sobrevive como âncora das FKs RESTRICT, e uma trava total impediria recriar o mesmo widget.
+alter table public.channel_sessions
+  add column if not exists web_widget_id text;
+
+create unique index if not exists channel_sessions_web_widget_id_ativo_unique
+  on public.channel_sessions (organization_id, web_widget_id)
+  where web_widget_id is not null and archived_at is null;
+
 alter table public.channel_sessions
   drop constraint if exists channel_sessions_provider_check;
 
 alter table public.channel_sessions
   add constraint channel_sessions_provider_check
-  -- 'wacalls' (0233), 'zernio_social' (0368) e 'datafy' (0387) somados AQUI —
+  -- 'wacalls' (0233), 'zernio_social' (0368), 'datafy' (0387) e 'web' (8804) somados AQUI —
   -- UM bloco só por constraint (não duplicar drop+add por migration).
-  check (provider = any (array['waha'::text, 'meta_cloud'::text, 'zernio'::text, 'wacalls'::text, 'zernio_social'::text, 'datafy'::text]));
+  check (provider = any (array['waha'::text, 'meta_cloud'::text, 'zernio'::text, 'wacalls'::text, 'zernio_social'::text, 'datafy'::text, 'web'::text]));
 
 alter table public.channel_sessions
   drop constraint if exists channel_sessions_provider_ref_check;
@@ -9624,7 +9634,9 @@ alter table public.channel_sessions
     -- é o mesmo intermediário, com outra superfície de canal.
     (provider in ('zernio', 'zernio_social') and zernio_account_id is not null) or
     (provider = 'wacalls'    and wacalls_session_id    is not null) or
-    (provider = 'datafy'     and datafy_phone_number_id is not null)
+    (provider = 'datafy'     and datafy_phone_number_id is not null) or
+    -- 'web' (migration 8804): o chat do InterSuite; a referência é o id do widget.
+    (provider = 'web'        and web_widget_id          is not null)
   );
 
 comment on column public.channel_sessions.zernio_account_id is
@@ -35571,7 +35583,7 @@ comment on column public.contacts.social_identity is
 -- primeira conexão de rede social.
 alter table public.conversations drop constraint if exists conversations_channel_check;
 alter table public.conversations add constraint conversations_channel_check
-  check (channel in ('whatsapp', 'instagram', 'facebook'));
+  check (channel in ('whatsapp', 'instagram', 'facebook', 'web'));
 
 
 -- APÊNDICE 20260921030100_0369_prospeccao_nativa.sql
@@ -70975,45 +70987,12 @@ alter table public.ai_agent_versions
   add constraint ai_agent_versions_inbound_debounce_ms_check
   check (inbound_debounce_ms is null or (inbound_debounce_ms >= 0 and inbound_debounce_ms <= 60000));
 
--- ---- canal web — InterSuite (migration 0501) ----
--- Coluna discriminadora para sessões do canal `web`.
-alter table public.channel_sessions
-  add column if not exists web_widget_id text;
-
-create unique index if not exists channel_sessions_web_widget_id_ativo_unique
-  on public.channel_sessions (organization_id, web_widget_id)
-  where web_widget_id is not null and archived_at is null;
-
--- Provider CHECK: par drop/add para o update.sh reaplicar sem 'already exists'.
-alter table public.channel_sessions
-  drop constraint if exists channel_sessions_provider_check;
-alter table public.channel_sessions
-  add constraint channel_sessions_provider_check
-  check (provider = any (array[
-    'waha'::text, 'meta_cloud'::text, 'zernio'::text,
-    'wacalls'::text, 'zernio_social'::text, 'datafy'::text,
-    'web'::text
-  ]));
-
--- Provider-ref CHECK: garante que cada provider tem sua coluna discriminadora.
-alter table public.channel_sessions
-  drop constraint if exists channel_sessions_provider_ref_check;
-alter table public.channel_sessions
-  add constraint channel_sessions_provider_ref_check check (
-    (provider = 'waha'       and waha_session_name      is not null) or
-    (provider = 'meta_cloud' and meta_phone_number_id    is not null) or
-    (provider in ('zernio', 'zernio_social') and zernio_account_id is not null) or
-    (provider = 'wacalls'    and wacalls_session_id      is not null) or
-    (provider = 'datafy'     and datafy_phone_number_id  is not null) or
-    (provider = 'web'        and web_widget_id           is not null)
-  );
-
--- Canal de conversa CHECK: par drop/add.
-alter table public.conversations
-  drop constraint if exists conversations_channel_check;
-alter table public.conversations
-  add constraint conversations_channel_check
-  check (channel in ('whatsapp', 'instagram', 'facebook', 'web'));
+-- ---- canal web — InterSuite (migration 8804) ----
+-- Nada a reconstruir aqui. A coluna `web_widget_id`, o índice único parcial e o valor 'web'
+-- nas constraints channel_sessions_provider_check, channel_sessions_provider_ref_check e
+-- conversations_channel_check vivem no bloco ÚNICO de cada constraint, mais acima: uma
+-- constraint, um bloco (CLAUDE.md, migrations). Um segundo bloco aqui venceria o primeiro em
+-- silêncio e apagaria o vocabulário que o upstream acrescentasse depois.
 
 -- ---- a chave de mapas da organização (migration 0504) ----
 -- Pino do WhatsApp → rua/cidade/região aproximados (lib/mapas/). Server-side only.
