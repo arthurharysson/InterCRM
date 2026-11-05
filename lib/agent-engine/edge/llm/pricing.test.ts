@@ -82,9 +82,12 @@ describe("costCents — cada tarifa isolada, por modelo", () => {
     ["gpt-4o-mini", 15, 60, 7.5, 15, 15],
     ["gpt-4o", 250, 1000, 125, 250, 250],
     ["gpt-4o-2024-05-13", 500, 1500, 500, 500, 500],
-    // Linha 6 (conferida em 11/10/2026): leitura de cache a 0.05× só no gpt-6.1-sol.
+    // Linha 6 (conferida em 11/10/2026; Terra em 27/10/2026): leitura de cache a
+    // 0.05× só no gpt-6.1-sol e no gpt-6.1-terra.
     ["gpt-6-astra", 1000, 5000, 100, 1250, 1250],
     ["gpt-6.1-sol", 200, 1000, 10, 250, 250],
+    // Terra: helpers usam 1M de entrada (>272k), logo entrada/cache estão na faixa longa.
+    ["gpt-6.1-terra", 200, 500, 10, 250, 250],
     ["gpt-6-luna", 10, 50, 1, 12.5, 12.5],
     ["gpt-5.6-terra", 200, 1200, 20, 250, 250],
     ["gpt-5.6-sol", 400, 2000, 40, 500, 500],
@@ -150,6 +153,46 @@ describe("Gemini 3.6/3.7/3.8 Flash — a promo acaba em 2027-01-01T00:00:00Z", (
     expect(entrada("gemini-3.5-flash", ANTES_DA_VIRADA)).toBeCloseTo(150, 6);
     expect(entrada("gemini-3.5-flash", VIRADA_2027)).toBeCloseTo(150, 6);
     expect(entrada("gemini-3.1-flash-lite", VIRADA_2027)).toBeCloseTo(25, 6);
+  });
+});
+
+describe("Gemini 4 Argon — a promo acaba em 2026-12-01T00:00:00Z", () => {
+  // Página ai.google.dev/gemini-api/docs/pricing, lida em 2026-10-19 (Standard):
+  // até 30/11/2026 entrada 2 / saída 10 / cache 0,10; a partir de 01/12/2026,
+  // 4 / 20 / 0,20. Leitura de cache = 0,05× a entrada ("95% off").
+  const ANTES_DA_VIRADA_ARGON = new Date("2026-11-30T23:59:59.999Z");
+  const VIRADA_ARGON = new Date("2026-12-01T00:00:00.000Z");
+
+  it("cobra a promo no instante anterior à virada", () => {
+    expect(entrada("gemini-4-argon", ANTES_DA_VIRADA_ARGON)).toBeCloseTo(200, 6);
+    expect(saida("gemini-4-argon", ANTES_DA_VIRADA_ARGON)).toBeCloseTo(1000, 6);
+    expect(leituraDeCache("gemini-4-argon", ANTES_DA_VIRADA_ARGON)).toBeCloseTo(10, 6);
+    expect(gravacaoDeCache("gemini-4-argon", "5m", ANTES_DA_VIRADA_ARGON)).toBeCloseTo(200, 6);
+    expect(gravacaoDeCache("gemini-4-argon", "1h", ANTES_DA_VIRADA_ARGON)).toBeCloseTo(200, 6);
+  });
+
+  it("cobra 4/20/0,20 a partir de 2026-12-01T00:00:00Z", () => {
+    expect(entrada("gemini-4-argon", VIRADA_ARGON)).toBeCloseTo(400, 6);
+    expect(saida("gemini-4-argon", VIRADA_ARGON)).toBeCloseTo(2000, 6);
+    expect(leituraDeCache("gemini-4-argon", VIRADA_ARGON)).toBeCloseTo(20, 6);
+    expect(gravacaoDeCache("gemini-4-argon", "5m", VIRADA_ARGON)).toBeCloseTo(400, 6);
+    expect(gravacaoDeCache("gemini-4-argon", "1h", VIRADA_ARGON)).toBeCloseTo(400, 6);
+  });
+
+  it("o prefixo google/ e o sufixo de data acompanham a virada", () => {
+    expect(entrada("google/gemini-4-argon", ANTES_DA_VIRADA_ARGON)).toBeCloseTo(200, 6);
+    expect(saida("google/gemini-4-argon", VIRADA_ARGON)).toBeCloseTo(2000, 6);
+    expect(entrada("gemini-4-argon-20261201", VIRADA_ARGON)).toBeCloseTo(400, 6);
+  });
+
+  it("cada promo tem o seu corte: a do Argon não mexe na dos Flash", () => {
+    expect(entrada("gemini-3.8-flash", VIRADA_ARGON)).toBeCloseTo(75, 6);
+    expect(entrada("gemini-4-argon", ANTES_DA_VIRADA)).toBeCloseTo(400, 6);
+  });
+
+  it("um id que só começa igual não herda o preço do Argon", () => {
+    expect(precoDoModelo("gemini-4")).toBeUndefined();
+    expect(precoDoModelo("gemini-4-argon-pro")).toBeUndefined();
   });
 });
 
@@ -356,4 +399,13 @@ describe("catálogo — Gemini 3.6/3.7/3.8 Flash fica em 150/750 nas duas tabela
       expect(tela?.saida).toBe(conta?.completion);
     },
   );
+
+  it("gemini-4-argon está a 400/2000 (tarifa de 01/12/2026) no catálogo e na conta", () => {
+    const tela = ultimoPrecoDaTela("gemini-4-argon");
+    const conta = ultimoPrecoDaConta("gemini-4-argon");
+    expect(tela, "gemini-4-argon sem preço em ai_models").toEqual({ entrada: 400, saida: 2000 });
+    expect(conta?.prompt).toBe(400);
+    expect(conta?.completion).toBe(2000);
+    expect(conta?.notes.startsWith("catálogo"), `notes=${conta?.notes}`).toBe(true);
+  });
 });
