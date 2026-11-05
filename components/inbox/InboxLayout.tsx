@@ -898,12 +898,12 @@ export function InboxLayout({
       ref={gradeRef}
       className={cn(
         "grid relative h-[calc(100dvh-var(--faixas-de-cima,0px)-3.5rem-var(--space-6)-max(var(--space-6),var(--rodape-ocupado,0px)))] w-full grid-cols-1 md:grid-cols-[300px_1fr] md:gap-3 md:-ml-4 md:w-[calc(100%+1.5rem)]",
-        // ALTURA DOS TRÊS CARTÕES (md+): o vão em volta cai de 24px para 8px. A casca
-        // dá 24px de respiro (`sm:p-6`); as margens negativas devolvem 16px em cima e
-        // embaixo, e a altura desconta só 8px de cada lado (ou o que o rodapé ocupar,
-        // se for mais). Margem em cima e embaixo somem juntas, senão o `<main>` ganha
-        // 16px de rolagem que ninguém pediu.
-        "md:-mt-4 md:-mb-4 md:h-[calc(100dvh-var(--faixas-de-cima,0px)-3.5rem-0.5rem-max(0.5rem,var(--rodape-ocupado,0px)))]",
+        // ALTURA DOS CARTÕES (md+): o vão em volta cai de 24px para 8px, e a grade
+        // ignora a reserva do rodapé — quem a respeita são os cartões que a peça fixa
+        // (o "Ramal conectado", no canto de baixo à direita) realmente cobre, abaixo.
+        // As margens negativas devolvem 16px em cima e o que a casca reservou embaixo
+        // (`padding-bottom` do `<main>`), senão a página ganharia rolagem à toa.
+        "md:-mt-4 md:-mb-[max(1rem,var(--rodape-ocupado,0px))] md:h-[calc(100dvh-var(--faixas-de-cima,0px)-3.5rem-1rem)]",
         // Recolhido (issue #3004), a terceira trilha vira o trilho estreito do
         // botão de expandir e a conversa fica com o que era da ficha. Duas
         // listas em vez de uma classe com valor em variável: o Tailwind precisa
@@ -1013,6 +1013,11 @@ export function InboxLayout({
         data-teclado-aberto={tecladoAberto ? "" : undefined}
         className={cn(
           "h-full min-h-0 min-w-0 flex-col md:flex group/conversa md:overflow-hidden md:rounded-2xl md:border md:border-border md:bg-card md:shadow-sm",
+          // O ramal fixo cobre o canto de baixo à direita: a conversa só cede altura
+          // a ele quando é a última coluna (sem ficha ao lado, ou com a ficha em trilho).
+          painelRecolhido
+            ? "md:max-h-[calc(100%_-_max(0px,var(--rodape-ocupado,0px)_-_0.5rem))]"
+            : "md:max-xl:max-h-[calc(100%_-_max(0px,var(--rodape-ocupado,0px)_-_0.5rem))]",
           colunas.conversa,
         )}
       >
@@ -1187,7 +1192,7 @@ export function InboxLayout({
         )}
       </div>
 
-      <div className="hidden h-full min-h-0 min-w-0 xl:block xl:overflow-hidden xl:rounded-2xl xl:border xl:border-border xl:bg-card xl:shadow-sm">
+      <div className="hidden h-full min-h-0 min-w-0 xl:block xl:overflow-hidden xl:rounded-2xl xl:border xl:border-border xl:bg-card xl:shadow-sm xl:max-h-[calc(100%_-_max(0px,var(--rodape-ocupado,0px)_-_0.5rem))]">
         <CRMSidePanel
           conversation={selectedConversation}
           recolhido={painelRecolhido}
