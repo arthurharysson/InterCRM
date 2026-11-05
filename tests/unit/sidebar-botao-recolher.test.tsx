@@ -61,7 +61,7 @@ function comoPapel(role: ActiveOrg["role"]) {
 }
 
 function linhaDaLogo(): Element | null {
-  return document.querySelector(".h-14");
+  return document.querySelector(".h-16");
 }
 
 function rodape(): Element | null {
