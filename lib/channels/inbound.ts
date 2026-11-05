@@ -1,6 +1,7 @@
 import { ingestSocialInbound, socialPayloadBelongsToSession } from "./social/ingest";
 import { CHANNEL_PROVIDER_SOCIAL, CHANNEL_PROVIDER_WEB } from "./capabilities";
 import { ingestWebInbound, parseWebPayload, verifyWebSignature } from "./web/ingest";
+import { HEADER_ASSINATURA_DE_ENTRADA } from "@/lib/webhooks/assinatura";
 /**
  * Entrada de webhook, do lado de dentro do seam.
  *
@@ -97,7 +98,7 @@ export function verifyInboundWebhookSignature(provider: string, raw: string, hea
   if (provider === CHANNEL_PROVIDER_WEB) {
     const webSecret = process.env.INTERSUITE_HMAC_SECRET_OUT;
     if (!webSecret || webSecret.length < MIN_SECRET_LEN) return false;
-    return verifyWebSignature(raw, headers.get("x-deskcomm-signature"), webSecret);
+    return verifyWebSignature(raw, headers.get(HEADER_ASSINATURA_DE_ENTRADA), webSecret);
   }
   if (!secret || secret.length < MIN_SECRET_LEN) return false;
   // Cada canal assina do seu jeito; o esquema do Datafy está em `graph-parceiro/webhook`.
@@ -475,7 +476,7 @@ async function webInbound(
     return { ok: false, code: "unauthorized", message: "webhook_secret_unavailable" };
   }
 
-  if (!verifyWebSignature(input.rawBody, input.headers.get("x-deskcomm-signature"), secret)) {
+  if (!verifyWebSignature(input.rawBody, input.headers.get(HEADER_ASSINATURA_DE_ENTRADA), secret)) {
     return { ok: false, code: "unauthorized", message: "bad_signature" };
   }
 

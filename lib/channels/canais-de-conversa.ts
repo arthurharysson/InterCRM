@@ -41,9 +41,10 @@ import { SOCIAL_NETWORKS } from "./social/catalog";
  */
 export const CANAIS_DE_CONVERSA = [
   "whatsapp",
-  // O transporte é o próprio InterSuite — não vem do catálogo de redes sociais.
-  "web",
   ...SOCIAL_NETWORKS.filter((rede) => rede.inbox).map((rede) => rede.id),
+  // O transporte é o próprio InterSuite — não vem do catálogo de redes sociais. No FIM da
+  // lista de propósito: a linha do upstream acima fica intocada e o próximo merge não a disputa.
+  "web",
 ] as const satisfies readonly string[];
 
 export type CanalDeConversa = (typeof CANAIS_DE_CONVERSA)[number];

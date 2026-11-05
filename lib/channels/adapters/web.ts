@@ -17,8 +17,10 @@
  */
 import { createHmac } from "node:crypto";
 
+import { HEADER_ASSINATURA_DE_ENTRADA } from "@/lib/webhooks/assinatura";
+
 import { CHANNEL_PROVIDER_WEB } from "../capabilities";
-import type { ChannelAdapter, OutboundEnvelope, RecipientInput } from "../types";
+import type { ChannelAdapter, ChannelHealth, OutboundEnvelope, RecipientInput } from "../types";
 
 const ENDPOINT = process.env.INTERSUITE_SUPPORT_URL;
 const SEGREDO_SAIDA = process.env.INTERSUITE_HMAC_SECRET_IN;
@@ -29,6 +31,19 @@ export const webAdapter: ChannelAdapter = {
   resolveRecipient: (input: RecipientInput) => (input.isGroup ? null : "web-thread"),
 
   isConfigured: () => Boolean(ENDPOINT && SEGREDO_SAIDA),
+
+  /**
+   * Não há sessão nem aparelho para consultar: o destinatário é uma aba do InterSuite. A
+   * pergunta que existe é se o canal CONSEGUE enviar — e quem decide isso é a configuração
+   * (`send` devolve sem enviar quando falta endereço ou segredo). `reachable: true` porque
+   * a resposta é local e certa, não um palpite de rede; sem configuração o status é FAILED
+   * e o motivo vai no detalhe, que é o que a Central mostra. Sem este método o cron de
+   * saúde PULA o canal em silêncio.
+   */
+  async checkHealth(): Promise<ChannelHealth> {
+    if (ENDPOINT && SEGREDO_SAIDA) return { reachable: true, status: "WORKING", detail: null };
+    return { reachable: true, status: "FAILED", detail: "web_not_configured" };
+  },
 
   codes: {
     notConfigured: "web_not_configured",
@@ -63,7 +78,8 @@ export const webAdapter: ChannelAdapter = {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "X-Deskcomm-Signature": assinatura,
+        // Nome do cabeçalho de assinatura: o mesmo dos webhooks do produto (HTTP não distingue caixa).
+        [HEADER_ASSINATURA_DE_ENTRADA]: assinatura,
       },
       body: corpo,
     });

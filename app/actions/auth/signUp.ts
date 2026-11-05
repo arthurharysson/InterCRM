@@ -19,6 +19,20 @@ import { modoDeCadastro } from "@/lib/auth/politica-de-cadastro";
 import { audit, hashEmail } from "@/lib/audit";
 import { authRateLimited, AUTH_LIMITS } from "@/lib/auth/rate-limit";
 import { env } from "@/lib/env";
+import {
+  CHAVE_FUSO_DO_CADASTRO,
+  CHAVE_IDIOMA_DO_CADASTRO,
+  pistasParaGuardar,
+} from "@/lib/auth/perfil-da-empresa-nova";
+
+/** As pistas saneadas, nas chaves que o provisionamento lê. */
+function metadadosDasPistas(pistas: { idioma?: string; fuso?: string } | undefined): Record<string, string> {
+  const limpas = pistasParaGuardar(pistas ?? {});
+  return {
+    ...(limpas.idioma ? { [CHAVE_IDIOMA_DO_CADASTRO]: limpas.idioma } : {}),
+    ...(limpas.fuso ? { [CHAVE_FUSO_DO_CADASTRO]: limpas.fuso } : {}),
+  };
+}
 
 export type SignUpResult =
   | {
@@ -53,13 +67,19 @@ export type SignUpResult =
        * anti-enumeração abaixo. Os dois convivem sem se confundir: a recusa por
        * política é decidida ANTES de tocar no GoTrue, então numa instalação
        * fechada quem chega sem convite nunca chega a saber se o e-mail existe.
+       *
+       * `email_indisponivel`: o provedor de auth não conseguiu mandar o e-mail
+       * de confirmação — é a instalação sem e-mail configurado no serviço de
+       * login, não um soluço. Tentar de novo nunca funciona; quem resolve é
+       * quem administra.
        */
       error:
         | "validation_error"
         | "rate_limited"
         | "signup_failed"
         | "somente_convite"
-        | "conta_ja_existe";
+        | "conta_ja_existe"
+        | "email_indisponivel";
       details?: Record<string, unknown>;
     };
 
@@ -82,6 +102,13 @@ export async function signUp(
    * token com o e-mail que o provedor de auth confirmou.
    */
   inviteToken?: string,
+  /**
+   * O idioma em que a tela de cadastro foi desenhada e o fuso do navegador.
+   * Viajam no `user_metadata` até `/auth/confirm`, onde a empresa NASCE com eles
+   * (`lib/auth/perfil-da-empresa-nova.ts`). São pistas, não autoridade: só
+   * idioma servido e fuso que o `Intl` reconhece passam do saneamento.
+   */
+  pistas?: { idioma?: string; fuso?: string },
 ): Promise<SignUpResult> {
   const temConvite = typeof inviteToken === "string" && inviteToken.trim() !== "";
   const parsed = temConvite
@@ -197,6 +224,7 @@ export async function signUp(
       });
       if (criada.motivo === "conta_ja_existe") return { ok: false, error: "conta_ja_existe" };
       if (criada.motivo === "rate_limited") return { ok: false, error: "rate_limited" };
+      if (criada.motivo === "email_de_confirmacao_falhou") return { ok: false, error: "email_indisponivel" };
       return { ok: false, error: "signup_failed" };
     }
 
@@ -231,7 +259,11 @@ export async function signUp(
             invite_token: convite,
             full_name: (parsed.data as SignupComConviteInput).full_name,
           }
-        : { org_name: (parsed.data as SignupInput).org_name, ...(planoEscolhido ? { cobranca_plan_id: planoEscolhido } : {}) },
+        : {
+            org_name: (parsed.data as SignupInput).org_name,
+            ...(planoEscolhido ? { cobranca_plan_id: planoEscolhido } : {}),
+            ...metadadosDasPistas(pistas),
+          },
     },
   });
 
@@ -282,6 +314,11 @@ export async function signUp(
       ip,
       userAgent,
     });
+    // Medido numa VPS v1.85.0: GoTrue sem SMTP devolve 500 "Error sending
+    // confirmation email", e a tela mandava "Tente novamente" — seis vezes na
+    // trilha, nenhuma podia dar certo. Não fura a anti-enumeração: conta que já
+    // existe recebe sucesso ofuscado sem e-mail, então nunca chega aqui.
+    if (/error sending/i.test(error.message)) return { ok: false, error: "email_indisponivel" };
     return { ok: false, error: "signup_failed" };
   }
 
