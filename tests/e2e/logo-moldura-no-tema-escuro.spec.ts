@@ -387,7 +387,7 @@ test.describe("a moldura do logo no tema escuro", () => {
     return s!;
   };
 
-  test("(1) tema ESCURO + logo ENVIADO: a barra lateral pinta a moldura clara", async ({
+  test("(1) tema ESCURO + logo ENVIADO: a barra lateral NÃO pinta moldura (decisão do dono)", async ({
     page,
   }) => {
     await loginComTotp(page, creds.users.dono!.email, secret());
@@ -408,24 +408,16 @@ test.describe("a moldura do logo no tema escuro", () => {
     anotar("1-barra-escuro.json", m);
     await page.screenshot({ path: evidencia("1-barra-escuro.png") });
 
+    // A BARRA LATERAL deixou de ter moldura por decisão do dono do produto: o logo é
+    // desenhado direto sobre a barra, e o contraste no escuro é da arte para o escuro
+    // (Configurações › Marca). A tela de entrada e a prévia (casos 3 e 4) mantêm a moldura.
     expect(
-      fundoEClaro(m.fundo),
-      `a moldura não foi pintada: o pai do <img> tem background-color=${m.fundo} ` +
-        `(tag=${m.tagDoPai}, classe="${m.classeDoPai}")`,
+      fundoETransparente(m.fundo),
+      `a barra lateral voltou a pintar uma moldura atrás do logo (fundo=${m.fundo}, ` +
+        `tag=${m.tagDoPai}, classe="${m.classeDoPai}")`,
     ).toBe(true);
-    expect(
-      m.padding.every((p) => p > 0),
-      `a moldura não tem folga: padding=${m.padding}`,
-    ).toBe(true);
-    expect(m.sombra, "a moldura não tem sombra").not.toBe("none");
-
-    // CONTENÇÃO, não proximidade: a moldura tem de ser MAIOR que o logo nos dois
-    // eixos e contê-lo. Uma moldura irmã (a sabotagem que derrubou a primeira
-    // versão da cerca unitária) teria fundo claro e não conteria nada.
-    expect(m.caixaDoPai.largura).toBeGreaterThan(m.caixaDoLogo.largura);
-    expect(m.caixaDoPai.altura).toBeGreaterThan(m.caixaDoLogo.altura);
-    expect(m.caixaDoPai.x).toBeLessThanOrEqual(m.caixaDoLogo.x);
-    expect(m.caixaDoPai.y).toBeLessThanOrEqual(m.caixaDoLogo.y);
+    expect(m.padding, "a barra lateral não pode ter folga de moldura").toEqual([0, 0, 0, 0]);
+    expect(m.sombra, "a barra lateral não pode ter sombra de moldura").toBe("none");
   });
 
   test("(2) tema CLARO + logo ENVIADO: NÃO há moldura — as classes são `dark:`", async ({
@@ -589,9 +581,9 @@ test.describe("a moldura do logo no tema escuro", () => {
       `o cabeçalho da barra MUDOU de retângulo entre os temas numa instalação SEM logo ` +
         `enviado — claro=${JSON.stringify(claro)} escuro=${JSON.stringify(escuro)}`,
     ).toEqual(claro);
-    // E ele continua sendo o `h-14` de sempre, no topo: a igualdade acima passaria
+    // E ele continua sendo o `h-16` de hoje, no topo: a igualdade acima passaria
     // se os DOIS tivessem mudado junto.
-    expect(escuro.altura, "o cabeçalho deixou de ser `h-14` (56px)").toBe(56);
+    expect(escuro.altura, "o cabeçalho deixou de ser `h-16` (64px)").toBe(64);
     expect(escuro.y, "o cabeçalho saiu do topo da barra").toBe(0);
   });
 

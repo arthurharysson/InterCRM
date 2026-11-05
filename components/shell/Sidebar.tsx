@@ -184,20 +184,20 @@ export function SidebarContent({
     <>
       <div
         className={cn(
-          "flex h-16 items-center border-b px-5",
+          "flex h-16 items-center border-b px-4",
           collapsed ? "justify-center" : "justify-start",
         )}
       >
         {(logo || logoEscuro) && !collapsed ? (
-          // Sem arte própria para o escuro, preserva a proteção de contraste.
+          // SEM CAIXA BRANCA atrás do logo, por decisão do dono do produto: o logo é
+          // desenhado direto sobre a barra. Quem cuida do contraste no tema escuro é a
+          // arte para o escuro (Configurações › Marca); sem ela, uma arte pensada para
+          // fundo claro pode ficar pouco legível.
           <div
-            className={cn(
-              // `min-w-0`: item de flex não encolhe abaixo do `min-width: auto`,
-              // que é o valor padrão — sem isso, uma arte própria larga empurra o
-              // botão de recolher para fora da barra em vez de encolher.
-              "min-w-0 rounded-md",
-              !logoEscuro && "dark:bg-white dark:px-2 dark:py-1 dark:shadow-sm",
-            )}
+            // `min-w-0`: item de flex não encolhe abaixo do `min-width: auto`,
+            // que é o valor padrão — sem isso, uma arte própria larga empurra o
+            // botão de recolher para fora da barra em vez de encolher.
+            className="min-w-0"
           >
             {/* <img> em vez de next/image de propósito: a URL vem de quem hospeda
               (banco ou .env), e next/image exige allowlist de domínios fechada em
@@ -220,7 +220,10 @@ export function SidebarContent({
                   // `max-w-[10rem]` + `max-w-full` não valem os dois: disputam a
                   // MESMA propriedade no CSS e só um sobrevive — a pegadinha que o
                   // review apontou, e por isso o teto é um único `min()`.
-                  "h-9 w-auto max-w-[min(10rem,100%)] object-contain",
+                  //
+                  // O teto subiu de 10rem para 11rem: a linha passou a `px-4` e tem ~224px,
+                  // e o botão de recolher ocupa ~44 — sobram ~180px para o logo.
+                  "h-10 w-auto max-w-[min(11rem,100%)] object-contain",
                   logoEscuro && "dark:hidden",
                 )}
               />
@@ -239,7 +242,7 @@ export function SidebarContent({
               <img
                 src={logoEscuro}
                 alt={nome}
-                className="hidden h-9 w-auto max-w-[min(10rem,100%)] object-contain dark:block"
+                className="hidden h-10 w-auto max-w-[min(11rem,100%)] object-contain dark:block"
               />
             ) : null}
           </div>
