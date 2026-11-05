@@ -119,12 +119,66 @@ export const LARGURA_MINIMA_DO_LOGO = 512;
 const ESCADA_DE_LARGURAS = [LARGURA_MAXIMA_DO_LOGO, 640, LARGURA_MINIMA_DO_LOGO];
 
 /**
+ * A MARGEM QUE VALE O RECORTE QUANDO O ARQUIVO JÁ CABE NO TETO.
+ *
+ * Um logo exportado numa folha A4 (3508×2481, 57 KB) cabe no teto e passava reto,
+ * com o desenho ocupando ~27% da altura: na barra lateral (40px de linha) ele
+ * aparecia com ~10px de altura útil. O recorte não perde resolução nenhuma — só
+ * descarta pixels de alfa zero —, então vale sempre que a margem é grande.
+ *
+ * Só dispara quando a caixa útil é MENOR que este tanto da imagem, em largura OU em
+ * altura. Margem pequena (um respiro de 3% que o designer deixou de propósito) não
+ * justifica regravar o arquivo: o byte idêntico segue valendo para ela.
+ */
+const FRACAO_ABAIXO_DA_QUAL_A_MARGEM_VALE_O_RECORTE = 0.9;
+
+/**
+ * Logo que já cabe no teto: recorta a margem transparente SE ela for grande.
+ * Devolve `null` quando não há o que fazer — e aí quem chama manda o original,
+ * byte a byte. Toda falha técnica (sem decodificador, arquivo que o navegador não
+ * abre, reencode maior que o teto) cai no mesmo `null`: o ajuste é um favor, nunca
+ * um motivo para recusar ou piorar o que já estava bom.
+ */
+async function recortarMargemGrande(
+  arquivo: File,
+  motor: MotorDeAjuste,
+  limite: number,
+): Promise<AjusteDeLogo | null> {
+  let imagem: ImagemDeLogo;
+  try {
+    imagem = await motor.inspecionar(arquivo);
+  } catch {
+    return null;
+  }
+  const { caixa } = imagem;
+  if (!caixa) return null;
+  const margemGrande =
+    caixa.largura < imagem.largura * FRACAO_ABAIXO_DA_QUAL_A_MARGEM_VALE_O_RECORTE ||
+    caixa.altura < imagem.altura * FRACAO_ABAIXO_DA_QUAL_A_MARGEM_VALE_O_RECORTE;
+  if (!margemGrande) return null;
+
+  let bytes: Uint8Array<ArrayBuffer>;
+  try {
+    bytes = await motor.reencodar(arquivo, { caixa, escala: 1 });
+  } catch {
+    return null;
+  }
+  if (bytes.length > limite) return null;
+  return {
+    arquivo: new File([bytes], arquivo.name, { type: arquivo.type || "image/png" }),
+    ajustado: true,
+    recusar: false,
+  };
+}
+
+/**
  * O logo pronto para enviar — ou a recusa antes de subir.
  *
  * Ordem das tentativas, e por quê nesta ordem:
- *   1. já cabe no teto → devolve o arquivo intacto (byte a byte), sem decodificar;
- *   2. recorte da margem transparente, no tamanho nativo → é a única tentativa
- *      que não perde resolução, então vem sozinha e primeiro;
+ *   1. já cabe no teto → recorta a margem transparente SE ela for grande
+ *      (`recortarMargemGrande`); do contrário devolve o arquivo intacto, byte a byte;
+ *   2. não cabe: recorte da margem transparente, no tamanho nativo → é a única
+ *      tentativa que não perde resolução, então vem sozinha e primeiro;
  *   3. escada de larguras (800 → 640 → 512), sempre a partir da caixa útil;
  *   4. nada coube → `recusar`.
  */
@@ -133,9 +187,18 @@ export async function ajustarLogo(
   motor: MotorDeAjuste,
   limite: number = TAMANHO_MAXIMO_DO_LOGO,
 ): Promise<AjusteDeLogo> {
-  // O caminho comum: logo dentro do teto não é tocado. "Não piorar o que já
-  // está bom" é byte idêntico, não um reencode que troca nitidez por nada.
-  if (arquivo.size <= limite) return { arquivo, ajustado: false, recusar: false };
+  // O caminho comum: logo dentro do teto e sem margem grande não é tocado. "Não
+  // piorar o que já está bom" é byte idêntico, não um reencode que troca nitidez
+  // por nada.
+  if (arquivo.size <= limite) {
+    return (
+      (await recortarMargemGrande(arquivo, motor, limite)) ?? {
+        arquivo,
+        ajustado: false,
+        recusar: false,
+      }
+    );
+  }
 
   let imagem: ImagemDeLogo;
   try {
