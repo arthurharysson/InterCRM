@@ -33028,6 +33028,11 @@ alter table public.voice_calls
   add column if not exists transcript jsonb,
   add column if not exists metadata jsonb not null default '{}'::jsonb;
 
+-- Cura antes da regra (um clone que rodou a 1ª tentativa da integração Fluxo, revertida em
+-- 18/10/2026, tem ligações com provider = 'fluxo'; a telefonia é a mesma, SIP). Sem isto a
+-- regra abaixo falha com "violated by some row" e o banco fica SEM ela.
+update public.voice_calls set provider = 'sip' where provider = 'fluxo';
+
 alter table public.voice_calls drop constraint if exists voice_calls_provider_check;
 alter table public.voice_calls
   add constraint voice_calls_provider_check
@@ -72277,6 +72282,10 @@ create trigger trg_user_webphone_ramais_set_updated_at
 
 -- View segura: NUNCA expõe secret_encrypted/iv/tag. `security_invoker = true`
 -- faz a RLS da tabela base valer através dela.
+-- `drop` antes do `create`: num banco que já recebeu a migration 8802 a visão tem a coluna
+-- `sip_user`, e `create or replace` recusa uma definição com MENOS colunas ("cannot drop
+-- columns from view"). A visão não tem dependentes; o bloco 8802 logo abaixo a recria completa.
+drop view if exists public.user_webphone_ramais_safe;
 create or replace view public.user_webphone_ramais_safe
   with (security_invoker = true) as
 select
