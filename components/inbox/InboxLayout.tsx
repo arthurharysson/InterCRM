@@ -853,7 +853,7 @@ export function InboxLayout({
 
   // Altura da grade: a conta desconta TUDO que fica acima e abaixo dela.
   //   --faixas-de-cima  as faixas do topo (canal caído etc., `FaixasDeCima`)
-  //   3.5rem            TopBar (`h-14`, em components/shell/TopBar.tsx)
+  //   4rem              TopBar (`h-16`, em components/shell/TopBar.tsx)
   //   2 * --space-6     padding do <main> do AppShell (`p-6`, em cima e embaixo)
   //
   // Com `100vh-3.5rem` o padding ficava de fora e a grade media 48px a MAIS que a
@@ -897,13 +897,13 @@ export function InboxLayout({
     <div
       ref={gradeRef}
       className={cn(
-        "grid relative h-[calc(100dvh-var(--faixas-de-cima,0px)-3.5rem-var(--space-6)-max(var(--space-6),var(--rodape-ocupado,0px)))] w-full grid-cols-1 md:grid-cols-[300px_1fr] md:gap-3 md:-ml-4 md:w-[calc(100%+1.5rem)]",
+        "grid relative h-[calc(100dvh-var(--faixas-de-cima,0px)-4rem-var(--space-6)-max(var(--space-6),var(--rodape-ocupado,0px)))] w-full grid-cols-1 md:grid-cols-[300px_1fr] md:gap-3",
         // ALTURA DOS CARTÕES (md+): o vão em volta cai de 24px para 8px, e a grade
         // ignora a reserva do rodapé — quem a respeita são os cartões que a peça fixa
         // (o "Ramal conectado", no canto de baixo à direita) realmente cobre, abaixo.
         // As margens negativas devolvem 16px em cima e o que a casca reservou embaixo
         // (`padding-bottom` do `<main>`), senão a página ganharia rolagem à toa.
-        "md:-mt-4 md:-mb-[max(1rem,var(--rodape-ocupado,0px))] md:h-[calc(100dvh-var(--faixas-de-cima,0px)-3.5rem-1rem)]",
+        "md:-mt-4 md:-mb-[max(1rem,var(--rodape-ocupado,0px))] md:h-[calc(100dvh-var(--faixas-de-cima,0px)-4rem-1rem)]",
         // Recolhido (issue #3004), a terceira trilha vira o trilho estreito do
         // botão de expandir e a conversa fica com o que era da ficha. Duas
         // listas em vez de uma classe com valor em variável: o Tailwind precisa

@@ -41,8 +41,9 @@ const CHAVE_GRUPOS_FECHADOS = "sidebar-grupos-fechados";
 function classeDoDestino(ativo: boolean, collapsed: boolean): string {
   return cn(
     "relative flex items-center rounded-xl text-sm transition-colors",
-    // 28px de linha: o menu inteiro tem de caber em 1280×900 sem rolar (`navegacao.spec.ts`).
-    collapsed ? "mx-auto h-7 w-11 justify-center" : "h-7 gap-3 px-3",
+    // 40px de linha, como no desenho de referência. O menu inteiro NÃO cabe mais sem
+    // rolar em 900px: ele rola dentro da própria caixa (`navegacao.spec.ts`).
+    collapsed ? "mx-auto h-10 w-12 justify-center" : "h-10 gap-3 px-3.5",
     // O ATIVO É UMA PÍLULA CHEIA na cor da marca (`bg-accent`), como no desenho de
     // referência; o inativo é só traço fino e some no fundo até o hover.
     ativo
@@ -183,7 +184,7 @@ export function SidebarContent({
     <>
       <div
         className={cn(
-          "flex h-14 items-center border-b px-4",
+          "flex h-16 items-center border-b px-5",
           collapsed ? "justify-center" : "justify-start",
         )}
       >
@@ -351,7 +352,7 @@ export function SidebarContent({
         e nenhum destino novo apareceu aqui.
       */}
       <nav
-        className="flex-1 space-y-1 overflow-y-auto px-3 py-1"
+        className="flex-1 space-y-2 overflow-y-auto px-2.5 py-2"
         aria-label={t("Navegação principal")}
       >
         {grupos.map(({ group, items }) => {
@@ -371,7 +372,7 @@ export function SidebarContent({
                     type="button"
                     onClick={() => toggleGrupo(group.id)}
                     aria-expanded={aberto}
-                    className="flex w-full items-center justify-between rounded-lg px-3 py-1 text-[11px] font-semibold tracking-wider text-text-subtle uppercase transition-colors hover:text-foreground"
+                    className="flex w-full items-center justify-between rounded-lg px-3.5 py-2 text-[11px] font-semibold tracking-widest text-text-subtle uppercase transition-colors hover:text-foreground"
                   >
                     {t(group.label)}
                     <CaretDown
@@ -568,8 +569,9 @@ export function Sidebar({ collapsed }: { collapsed: boolean }) {
         // tabela de durações, e número solto é o que a faz apodrecer.
         "sticky top-[var(--faixas-de-cima,0px)] z-30 flex h-[calc(100dvh-var(--faixas-de-cima,0px))] shrink-0 transition-[width] duration-base",
         // Encostada na borda da janela, com a linha divisória à direita (o `border-r`
-        // do painel de dentro faz parte destas larguras): 256px aberta, 72px recolhida.
-        collapsed ? "w-[4.5rem]" : "w-64",
+        // do painel de dentro faz parte destas larguras): 256px aberta, 64px recolhida. Mais larga que isto, a conversa com a ficha
+        // aberta passa do espaço em 1280px e o `<main>` ganha barra de rolagem horizontal.
+        collapsed ? "w-16" : "w-64",
       )}
     >
       {/*

@@ -219,23 +219,34 @@ test.describe("navegação agrupada", () => {
    *
    * Medido por ferramenta, nunca a olho.
    */
-  test("nenhum grupo fica fora da dobra, e em 900px o menu não rola", async ({ page }) => {
+  test("nenhum grupo fica inalcançável: o menu rola na própria caixa, e a página não", async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 900 });
     await loginAdmin(page);
 
+    // Desde o desenho de linhas de 40px o menu inteiro não cabe em 900px sem rolar:
+    // ele rola DENTRO da própria caixa. O que se cobra agora é que (1) ele é uma caixa
+    // rolável de verdade, (2) rolada até o fim todo título de grupo fica à vista, e
+    // (3) a página em volta não ganha rolagem por causa dele.
     const m = await page.evaluate(() => {
-      const nav = document.querySelector('nav[aria-label="Navegação principal"]')!;
+      const nav = document.querySelector('nav[aria-label="Navegação principal"]') as HTMLElement;
+      const rolavel = getComputedStyle(nav).overflowY === "auto" || getComputedStyle(nav).overflowY === "scroll";
+      nav.scrollTop = nav.scrollHeight;
       const r = nav.getBoundingClientRect();
+      const titulos = [...nav.querySelectorAll("h2")];
+      const ultimo = titulos[titulos.length - 1]?.getBoundingClientRect();
       return {
-        rola: nav.scrollHeight > Math.round(r.height) + 1,
-        titulosFora: [...nav.querySelectorAll("h2")].filter(
-          (h) => h.getBoundingClientRect().bottom > r.bottom,
-        ).length,
+        rolavel,
+        titulosTotal: titulos.length,
+        // Rolado até o fim, o ÚLTIMO título de grupo tem de estar dentro da caixa.
+        ultimoAVista: !!ultimo && ultimo.top >= r.top - 1 && ultimo.bottom <= r.bottom + 1,
+        paginaRola: document.documentElement.scrollHeight > window.innerHeight + 1,
       };
     });
 
-    expect(m.titulosFora, "grupo inteiro invisível é o problema que viemos resolver").toBe(0);
-    expect(m.rola, "em 900px o menu inteiro tem de caber sem scroll").toBe(false);
+    expect(m.rolavel, "o menu tem de rolar na própria caixa, não vazar da barra").toBe(true);
+    expect(m.paginaRola, "o menu não pode fazer a página inteira rolar").toBe(false);
+    expect(m.titulosTotal).toBeGreaterThan(0);
+    expect(m.ultimoAVista, "rolado até o fim, o último grupo tem de estar à vista").toBe(true);
   });
 
   test.describe("mobile", () => {

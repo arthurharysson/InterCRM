@@ -45,7 +45,7 @@
  *
  * Ele desconta no `<main>`. Tela que calcula a PRÓPRIA altura a partir da
  * janela — o `grid` do Inbox, em `components/inbox/InboxLayout.tsx`, que se
- * mede por `100dvh - 3.5rem - 2*var(--space-6)` — não passa por aqui e segue
+ * mede por `100dvh - 4rem - 2*var(--space-6)` — não passa por aqui e segue
  * com a medida dela; quem fechar aquilo troca o número de lá por esta variável.
  */
 import {
