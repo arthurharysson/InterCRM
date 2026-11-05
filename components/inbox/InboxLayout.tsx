@@ -898,6 +898,12 @@ export function InboxLayout({
       ref={gradeRef}
       className={cn(
         "grid relative h-[calc(100dvh-var(--faixas-de-cima,0px)-3.5rem-var(--space-6)-max(var(--space-6),var(--rodape-ocupado,0px)))] w-full grid-cols-1 md:grid-cols-[300px_1fr] md:gap-3 md:-ml-4 md:w-[calc(100%+1.5rem)]",
+        // ALTURA DOS TRÊS CARTÕES (md+): o vão em volta cai de 24px para 8px. A casca
+        // dá 24px de respiro (`sm:p-6`); as margens negativas devolvem 16px em cima e
+        // embaixo, e a altura desconta só 8px de cada lado (ou o que o rodapé ocupar,
+        // se for mais). Margem em cima e embaixo somem juntas, senão o `<main>` ganha
+        // 16px de rolagem que ninguém pediu.
+        "md:-mt-4 md:-mb-4 md:h-[calc(100dvh-var(--faixas-de-cima,0px)-3.5rem-0.5rem-max(0.5rem,var(--rodape-ocupado,0px)))]",
         // Recolhido (issue #3004), a terceira trilha vira o trilho estreito do
         // botão de expandir e a conversa fica com o que era da ficha. Duas
         // listas em vez de uma classe com valor em variável: o Tailwind precisa
