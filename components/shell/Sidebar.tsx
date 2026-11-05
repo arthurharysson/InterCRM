@@ -220,7 +220,7 @@ export function SidebarContent({
                   // `max-w-[10rem]` + `max-w-full` não valem os dois: disputam a
                   // MESMA propriedade no CSS e só um sobrevive — a pegadinha que o
                   // review apontou, e por isso o teto é um único `min()`.
-                  "h-7 w-auto max-w-[min(10rem,100%)] object-contain",
+                  "h-9 w-auto max-w-[min(10rem,100%)] object-contain",
                   logoEscuro && "dark:hidden",
                 )}
               />
@@ -239,7 +239,7 @@ export function SidebarContent({
               <img
                 src={logoEscuro}
                 alt={nome}
-                className="hidden h-7 w-auto max-w-[min(10rem,100%)] object-contain dark:block"
+                className="hidden h-9 w-auto max-w-[min(10rem,100%)] object-contain dark:block"
               />
             ) : null}
           </div>
