@@ -118,16 +118,17 @@ describe("o tema não diverge entre o SSR e a primeira renderização do cliente
     const doServidor = renderizarComoServidor();
     const doCliente = renderizarComoPrimeiraPassadaDoCliente();
 
-    // Os dois precisam dizer "system" — é o valor que `readStoredTheme()`
-    // devolve sem `window`, e é o que a hidratação tem de bater ANTES do
-    // efeito que sincroniza com o localStorage rodar.
-    expect(doServidor).toContain("Tema: system");
+    // Os dois precisam dizer "light" — é o valor que `readStoredTheme()`
+    // devolve sem `window` (o padrão do produto não é mais "system": o tema é
+    // escolha manual), e é o que a hidratação tem de bater ANTES do efeito que
+    // sincroniza com o localStorage rodar.
+    expect(doServidor).toContain("Tema: light");
     expect(
       doCliente,
       "A primeira renderização do cliente leu o localStorage direto no " +
         "inicializador do useState, produzindo 'Tema: dark' — diferente do " +
-        "que o servidor mandou ('Tema: system'). É o hydration mismatch.",
-    ).toContain("Tema: system");
+        "que o servidor mandou ('Tema: light'). É o hydration mismatch.",
+    ).toContain("Tema: light");
     expect(doCliente).toBe(doServidor);
   });
 
@@ -152,5 +153,46 @@ describe("o tema não diverge entre o SSR e a primeira renderização do cliente
       createRoot(container).render(ARVORE);
     });
     expect(container.innerHTML).toContain("Tema: dark");
+  });
+});
+
+describe("o tema é escolha manual — o navegador não decide", () => {
+  it("navegador em modo escuro e nenhuma escolha salva: continua claro", () => {
+    // O Windows/macOS escuro NÃO pode escurecer o produto sozinho.
+    stubMatchMedia(true);
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    act(() => {
+      createRoot(container).render(ARVORE);
+    });
+    expect(container.innerHTML).toContain("Tema: light");
+    expect(document.documentElement.getAttribute("data-theme")).toBe("light");
+  });
+
+  it("o antigo valor 'system' salvo no navegador é lido como claro", () => {
+    stubMatchMedia(true);
+    window.localStorage.setItem(CHAVE, "system");
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    act(() => {
+      createRoot(container).render(ARVORE);
+    });
+    expect(container.innerHTML).toContain("Tema: light");
+    expect(document.documentElement.getAttribute("data-theme")).toBe("light");
+  });
+
+  it("o botão alterna só entre claro e escuro, e a escolha fica salva", () => {
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    act(() => {
+      createRoot(container).render(ARVORE);
+    });
+    const botao = container.querySelector("button") as HTMLButtonElement;
+    act(() => botao.click());
+    expect(container.innerHTML).toContain("Tema: dark");
+    expect(window.localStorage.getItem(CHAVE)).toBe("dark");
+    act(() => botao.click());
+    expect(container.innerHTML).toContain("Tema: light");
+    expect(window.localStorage.getItem(CHAVE)).toBe("light");
   });
 });

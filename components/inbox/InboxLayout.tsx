@@ -897,7 +897,7 @@ export function InboxLayout({
     <div
       ref={gradeRef}
       className={cn(
-        "grid relative h-[calc(100dvh-var(--faixas-de-cima,0px)-3.5rem-var(--space-6)-max(var(--space-6),var(--rodape-ocupado,0px)))] w-full grid-cols-1 md:grid-cols-[300px_1fr]",
+        "grid relative h-[calc(100dvh-var(--faixas-de-cima,0px)-3.5rem-var(--space-6)-max(var(--space-6),var(--rodape-ocupado,0px)))] w-full grid-cols-1 md:grid-cols-[300px_1fr] md:gap-3",
         // Recolhido (issue #3004), a terceira trilha vira o trilho estreito do
         // botão de expandir e a conversa fica com o que era da ficha. Duas
         // listas em vez de uma classe com valor em variável: o Tailwind precisa
@@ -946,7 +946,9 @@ export function InboxLayout({
       <div
         ref={listaRef}
         className={cn(
-          "h-full min-h-0 flex-col border-r border-border md:flex",
+          // Cartão flutuante a partir do `md` (desenho aprovado em nov/2026): a divisória de
+          // linha (`border-r`) virou o vão `md:gap-3` da grade + a borda e a sombra do cartão.
+          "h-full min-h-0 flex-col md:flex md:overflow-hidden md:rounded-2xl md:border md:border-border md:bg-card md:shadow-sm",
           colunas.lista,
         )}
       >
@@ -1004,7 +1006,7 @@ export function InboxLayout({
         ref={conversaRef}
         data-teclado-aberto={tecladoAberto ? "" : undefined}
         className={cn(
-          "h-full min-h-0 min-w-0 flex-col md:flex group/conversa",
+          "h-full min-h-0 min-w-0 flex-col md:flex group/conversa md:overflow-hidden md:rounded-2xl md:border md:border-border md:bg-card md:shadow-sm",
           colunas.conversa,
         )}
       >
@@ -1179,7 +1181,7 @@ export function InboxLayout({
         )}
       </div>
 
-      <div className="hidden h-full min-h-0 min-w-0 xl:block">
+      <div className="hidden h-full min-h-0 min-w-0 xl:block xl:overflow-hidden xl:rounded-2xl xl:border xl:border-border xl:bg-card xl:shadow-sm">
         <CRMSidePanel
           conversation={selectedConversation}
           recolhido={painelRecolhido}
@@ -1215,7 +1217,8 @@ export function InboxLayout({
             onDoubleClick={restaurarPadrao}
             onKeyDown={(evento) => teclarNaDivisoria("lista", evento)}
             className="group absolute inset-y-0 z-10 flex w-2 -translate-x-1/2 cursor-col-resize touch-none select-none items-stretch justify-center focus-visible:outline-hidden"
-            style={{ left: `${efetivas.lista}px` }}
+            // +6px: a alça fica no MEIO do vão de 12px entre os cartões, não na borda do da lista.
+            style={{ left: `${efetivas.lista + 6}px` }}
           >
             <span
               aria-hidden
@@ -1237,7 +1240,7 @@ export function InboxLayout({
               onDoubleClick={restaurarPadrao}
               onKeyDown={(evento) => teclarNaDivisoria("ficha", evento)}
               className="group absolute inset-y-0 z-10 flex w-2 translate-x-1/2 cursor-col-resize touch-none select-none items-stretch justify-center focus-visible:outline-hidden"
-              style={{ right: `${efetivas.ficha}px` }}
+              style={{ right: `${efetivas.ficha + 6}px` }}
             >
               <span
                 aria-hidden

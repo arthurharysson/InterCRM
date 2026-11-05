@@ -2,7 +2,7 @@
 
 import { useTheme } from "@/lib/theme";
 import { useHotkeys } from "react-hotkeys-hook";
-import { Sun, Moon, MonitorPlay } from "@/lib/ui/icons";
+import { Sun, Moon } from "@/lib/ui/icons";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useT } from "@/hooks/i18n/useT";
@@ -23,13 +23,15 @@ export function ThemeToggle({ className }: { className?: string }) {
   const t = useT();
   const { theme, setTheme } = useTheme();
 
+  // Alterna entre claro e escuro, na mão. Não existe mais a volta "sistema":
+  // o tema nunca acompanha o navegador (ver `lib/theme.tsx`).
   const cycle = () => {
-    setTheme(theme === "light" ? "dark" : theme === "dark" ? "system" : "light");
+    setTheme(theme === "dark" ? "light" : "dark");
   };
 
   useHotkeys("mod+shift+l", cycle, { preventDefault: true }, [theme]);
 
-  const Icon = theme === "dark" ? Moon : theme === "system" ? MonitorPlay : Sun;
+  const Icon = theme === "dark" ? Moon : Sun;
 
   return (
     <Button

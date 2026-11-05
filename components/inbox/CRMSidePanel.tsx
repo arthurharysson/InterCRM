@@ -1023,7 +1023,7 @@ export function CRMSidePanel({
   if (recolhido && onAlternarRecolhido) {
     return (
       <aside
-        className="flex h-full flex-col items-center border-l border-border bg-background py-2"
+        className="flex h-full flex-col items-center bg-card py-2"
         data-testid="inbox-painel-recolhido"
       >
         <BotaoDeRecolherDoPainel recolhido onAlternar={onAlternarRecolhido} />
@@ -1033,7 +1033,7 @@ export function CRMSidePanel({
 
   if (!conversation) {
     return (
-      <aside className="relative flex h-full items-center justify-center border-l border-border p-4 text-center text-xs text-muted-foreground">
+      <aside className="relative flex h-full items-center justify-center bg-card p-4 text-center text-xs text-muted-foreground">
         {onAlternarRecolhido && (
           <div className="absolute top-2 right-2">
             <BotaoDeRecolherDoPainel recolhido={false} onAlternar={onAlternarRecolhido} />
@@ -1446,7 +1446,7 @@ export function CRMSidePanel({
   };
 
   return (
-    <aside className="flex h-full flex-col gap-4 overflow-y-auto border-l border-border bg-background p-4">
+    <aside className="flex h-full flex-col gap-4 overflow-y-auto bg-card p-4">
       {/* A FAIXA DO ALTO (#3004/#3008): o recolher do painel, no mesmo lugar do
           recolher do menu da esquerda, e o botão que abre a personalização da
           lateral. `sticky` para não rolar para fora com o conteúdo, e o
@@ -1458,7 +1458,7 @@ export function CRMSidePanel({
           celular chega à personalização. Sem o controle de recolher, o espaço
           dele fica com um vazio — o botão de módulos não muda de lugar. */}
       <div
-        className="sticky top-0 z-10 -mx-4 -mt-4 flex shrink-0 items-center justify-between gap-2 border-b border-border bg-background px-4 py-1"
+        className="sticky top-0 z-10 -mx-4 -mt-4 flex shrink-0 items-center justify-between gap-2 border-b border-border bg-card px-4 py-1"
         data-testid="inbox-cabecalho-do-painel"
       >
         <DialogoDosModulos modulos={modulos} onSalvos={setModulos} />

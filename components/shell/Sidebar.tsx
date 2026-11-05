@@ -20,6 +20,36 @@ import { usePrefetchPorIntencao } from "@/hooks/navigation/prefetchPorIntencao";
 
 const CHAVE_GRUPOS_FECHADOS = "sidebar-grupos-fechados";
 
+/**
+ * O desenho de UM destino do menu — itens, hub do grupo, Configurações e Ajuda
+ * saem daqui. Eram quatro cópias do mesmo `cn(...)`, e rodapé com um peso
+ * diferente do corpo lê-se como outro assunto.
+ *
+ * A COR vem toda de `--color-accent`, o token que a marca da organização
+ * sobrescreve (Configurações › Marca): item ativo, marcador lateral e contadores
+ * mudam juntos quando o revendedor põe a cor dele. Nada aqui é azul.
+ *
+ * A ALTURA É A DE SEMPRE — 28px, e o intervalo entre linhas caiu de 4px para 2px
+ * (`space-y-0.5` na lista). O e2e `navegacao.spec.ts` exige que o menu inteiro
+ * caiba em 1280×900 sem rolar (ver a nota de densidade mais abaixo), e o cartão
+ * flutuante gasta ~34px de moldura (16px de vão + borda + o que a marca ocupa):
+ * medido logado como admin, o menu PRECISA de ~715px sem a faixa do topo e, com
+ * linhas de 30px, faltavam 35. Linha de 28px + 2px de intervalo devolve 2px × as
+ * ~17 linhas. Recolhida, o destino vira uma pílula de 40×28 — não um quadrado de
+ * 44 —, pelo mesmo motivo.
+ */
+function classeDoDestino(ativo: boolean, collapsed: boolean): string {
+  return cn(
+    "relative flex items-center rounded-xl text-sm transition-colors",
+    collapsed ? "mx-auto h-7 w-10 justify-center" : "h-7 gap-3 px-3",
+    ativo
+      ? collapsed
+        ? "bg-accent text-accent-foreground shadow-sm"
+        : "bg-accent/10 font-medium text-accent before:absolute before:top-1.5 before:bottom-1.5 before:-left-2 before:w-1 before:rounded-r-full before:bg-accent"
+      : "text-muted-foreground hover:bg-muted hover:text-foreground",
+  );
+}
+
 interface SidebarContentProps {
   collapsed: boolean;
   showCollapseControl?: boolean;
@@ -320,7 +350,7 @@ export function SidebarContent({
         e nenhum destino novo apareceu aqui.
       */}
       <nav
-        className="flex-1 space-y-2 overflow-y-auto px-2 py-1"
+        className="flex-1 space-y-1 overflow-y-auto px-2 py-1"
         aria-label={t("Navegação principal")}
       >
         {grupos.map(({ group, items }) => {
@@ -340,7 +370,7 @@ export function SidebarContent({
                     type="button"
                     onClick={() => toggleGrupo(group.id)}
                     aria-expanded={aberto}
-                    className="flex w-full items-center justify-between rounded-md px-3 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent/40 hover:text-foreground"
+                    className="flex w-full items-center justify-between rounded-lg px-3 py-1 text-[11px] font-semibold tracking-wider text-text-subtle uppercase transition-colors hover:text-foreground"
                   >
                     {t(group.label)}
                     <CaretDown
@@ -359,7 +389,7 @@ export function SidebarContent({
                 <ul
                   aria-labelledby={collapsed ? undefined : tituloId}
                   aria-label={collapsed ? t(group.label) : undefined}
-                  className="space-y-1"
+                  className="space-y-0.5"
                 >
                   {items.map((item) => {
                     const isActive = pathname === item.href || pathname.startsWith(item.href + "/");
@@ -372,13 +402,7 @@ export function SidebarContent({
                           title={collapsed ? t(item.label) : undefined}
                           aria-current={isActive ? "page" : undefined}
                           onClick={onNavigate}
-                          className={cn(
-                            "relative flex items-center gap-3 rounded-md px-3 py-1 text-sm transition-colors",
-                            isActive
-                              ? "bg-accent text-accent-foreground"
-                              : "text-muted-foreground hover:bg-accent/50 hover:text-foreground",
-                            collapsed && "justify-center px-2",
-                          )}
+                          className={classeDoDestino(isActive, collapsed)}
                         >
                           <Icon size={18} weight={isActive ? "fill" : "regular"} aria-hidden />
                           {!collapsed && <span className="truncate">{t(item.label)}</span>}
@@ -404,13 +428,7 @@ export function SidebarContent({
                         title={collapsed ? t(group.hub.label) : undefined}
                         aria-current={pathname === group.hub.href ? "page" : undefined}
                         onClick={onNavigate}
-                        className={cn(
-                          "flex items-center gap-3 rounded-md px-3 py-1 text-sm transition-colors",
-                          pathname === group.hub.href
-                            ? "bg-accent text-accent-foreground"
-                            : "text-muted-foreground hover:bg-accent/50 hover:text-foreground",
-                          collapsed && "justify-center px-2",
-                        )}
+                        className={classeDoDestino(pathname === group.hub.href, collapsed)}
                       >
                         <ArrowRight size={18} aria-hidden />
                         {!collapsed && <span className="truncate">{t(group.hub.label)}</span>}
@@ -431,13 +449,7 @@ export function SidebarContent({
             title={collapsed ? t(rodape.label) : undefined}
             aria-current={pathname.startsWith(rodape.href) ? "page" : undefined}
             onClick={onNavigate}
-            className={cn(
-              "mb-0.5 flex items-center gap-3 rounded-md px-3 py-1 text-sm transition-colors",
-              pathname.startsWith(rodape.href)
-                ? "bg-accent text-accent-foreground"
-                : "text-muted-foreground hover:bg-accent/50 hover:text-foreground",
-              collapsed && "justify-center px-2",
-            )}
+            className={cn("mb-0.5", classeDoDestino(pathname.startsWith(rodape.href), collapsed))}
           >
             <Gear size={18} aria-hidden />
             {!collapsed && <span className="truncate">{t(rodape.label)}</span>}
@@ -454,13 +466,7 @@ export function SidebarContent({
             title={collapsed ? t(ajuda.label) : undefined}
             aria-current={pathname.startsWith(ajuda.href) ? "page" : undefined}
             onClick={onNavigate}
-            className={cn(
-              "mb-0.5 flex items-center gap-3 rounded-md px-3 py-1 text-sm transition-colors",
-              pathname.startsWith(ajuda.href)
-                ? "bg-accent text-accent-foreground"
-                : "text-muted-foreground hover:bg-accent/50 hover:text-foreground",
-              collapsed && "justify-center px-2",
-            )}
+            className={cn("mb-0.5", classeDoDestino(pathname.startsWith(ajuda.href), collapsed))}
           >
             <BookOpen size={18} aria-hidden />
             {!collapsed && <span className="truncate">{t(ajuda.label)}</span>}
@@ -507,7 +513,7 @@ function BotaoDeRecolher({
       onClick={onClick}
       disabled={isPending}
       className={cn(
-        "flex w-full items-center gap-2 rounded-md px-3 py-2 text-xs text-muted-foreground hover:bg-accent/50 hover:text-foreground",
+        "flex w-full items-center gap-2 rounded-xl px-3 py-2 text-xs text-muted-foreground hover:bg-muted hover:text-foreground",
         (collapsed || soIcone) && "justify-center px-2",
       )}
       aria-label={rotulo}
@@ -562,11 +568,22 @@ export function Sidebar({ collapsed }: { collapsed: boolean }) {
         // `duration-base` em vez do `duration-200` literal: 200ms é o mesmo
         // número, mas vindo de `--duration-base`. A Lei de movimento fecha a
         // tabela de durações, e número solto é o que a faz apodrecer.
-        "sticky top-[var(--faixas-de-cima,0px)] z-30 flex h-[calc(100dvh-var(--faixas-de-cima,0px))] shrink-0 flex-col border-r bg-card transition-[width] duration-base",
-        collapsed ? "w-16" : "w-60",
+        "sticky top-[var(--faixas-de-cima,0px)] z-30 flex h-[calc(100dvh-var(--faixas-de-cima,0px))] shrink-0 p-2 transition-[width] duration-base",
+        // A largura INCLUI os 8px de respiro de cada lado: o cartão de dentro
+        // mede 240px aberto e 72px recolhido (eram 240 e 64, sem respiro).
+        collapsed ? "w-[5.5rem]" : "w-64",
       )}
     >
-      <SidebarContent collapsed={collapsed} />
+      {/*
+        A barra FLUTUA por dentro, não por fora: o `aside` continua `sticky` e
+        ocupando lugar na linha (as cercas `barra-lateral-nao-flutua` existem por
+        causa de uma barra `fixed` que passou por cima da lista de conversas), e o
+        que parece solto é um cartão arredondado dentro dele. O `p-2` é o vão entre
+        o cartão, a borda da janela e o conteúdo.
+      */}
+      <div className="flex h-full w-full min-w-0 flex-col overflow-hidden rounded-2xl border bg-card shadow-md">
+        <SidebarContent collapsed={collapsed} />
+      </div>
     </aside>
   );
 }

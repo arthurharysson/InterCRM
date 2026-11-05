@@ -494,12 +494,16 @@ describe("no layout — duas divisorias arrastáveis (#2579)", () => {
   it("seta direita na alça da ficha leva a alça para a direita (a ficha encolhe)", async () => {
     montar();
     const ficha = await alca(1);
-    expect(ficha.style.right).toBe("296px");
+    // +6px: desde que as três colunas viraram cartões (vão de 12px, nov/2026), a alça fica
+    // no MEIO do vão e não na borda do cartão da ficha. O `aria-valuenow` continua sendo a
+    // largura pura da ficha — só a posição visual mudou.
+    const MEIO_DO_VAO = 6;
+    expect(ficha.style.right).toBe(`${296 + MEIO_DO_VAO}px`);
     fireEvent.keyDown(ficha, { key: "ArrowRight" });
     expect(ficha).toHaveAttribute("aria-valuenow", String(296 - PASSO_TECLADO));
-    expect(ficha.style.right).toBe(`${296 - PASSO_TECLADO}px`);
+    expect(ficha.style.right).toBe(`${296 - PASSO_TECLADO + MEIO_DO_VAO}px`);
     fireEvent.keyDown(ficha, { key: "ArrowLeft" });
-    expect(ficha.style.right).toBe("296px");
+    expect(ficha.style.right).toBe(`${296 + MEIO_DO_VAO}px`);
   });
 
   it("armazenamento bloqueado no navegador não derruba o Inbox", async () => {
