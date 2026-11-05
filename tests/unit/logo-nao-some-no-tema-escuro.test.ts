@@ -72,17 +72,15 @@ function imgDoLogoEstaDentroDoChip(fonte: string, classeDoChip: RegExp): boolean
 }
 
 describe("o logo do operador não some no tema escuro", () => {
-  it("a BARRA LATERAL desenha o logo sobre um chip claro quando o tema é escuro", () => {
+  it("a BARRA LATERAL desenha o logo direto sobre a barra, SEM chip claro (decisão do dono)", () => {
     const fonte = semComentario(leia("components/shell/Sidebar.tsx"));
 
-    // O chip existe...
-    expect(fonte, "sumiu o chip `dark:bg-white` da barra lateral").toMatch(/dark:bg-white/);
-    // ...e o `<img>` do logo está DENTRO dele. Sem esta segunda asserção, mover
-    // a classe para um irmão deixaria a cerca verde com o logo cru de novo.
-    expect(
-      imgDoLogoEstaDentroDoChip(fonte, /dark:bg-white/),
-      "o `<img>` do logo saiu de dentro do chip `dark:bg-white`",
-    ).toBe(true);
+    // O chip saiu da barra lateral por decisão do dono do produto: ele não queria um
+    // retângulo branco atrás do logo. O contraste no tema escuro passou a ser da arte
+    // para o escuro, enviada em Configurações › Marca. A tela de entrada e a prévia
+    // continuam com o chip (testes abaixo) — esta cerca só impede que ele volte
+    // à barra sem uma decisão nova.
+    expect(fonte, "o chip `dark:bg-white` voltou à barra lateral").not.toMatch(/dark:bg-white/);
   });
 
   it("a TELA DE ENTRADA desenha o logo sobre o mesmo chip", () => {

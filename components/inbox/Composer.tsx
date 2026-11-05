@@ -976,7 +976,7 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer(
         onDragLeave={onDragLeave}
         onDrop={onDrop}
         className={cn(
-          "relative border-t border-border bg-background px-3 py-2",
+          "relative border-t border-border bg-card px-4 py-3",
           mode === "note" && "border-warning/40 bg-warning-bg",
         )}
       >
@@ -1292,7 +1292,7 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer(
               // 16px abaixo do `md`: o Safari do iPhone AMPLIA a página ao focar
               // campo com fonte menor, e a conversa sai do quadro. 44px de alvo
               // até o `lg`, como o resto dos botões de toque.
-              "max-h-40 min-h-11 flex-1 resize-none rounded-md border border-input bg-background px-3 py-2 text-base md:text-sm lg:min-h-9",
+              "max-h-40 min-h-11 flex-1 resize-none rounded-xl border border-input bg-muted/40 px-3.5 py-2 text-base md:text-sm lg:min-h-10",
               "placeholder:text-muted-foreground focus:ring-1 focus:ring-ring focus:outline-hidden",
             )}
             disabled={mode === "note" ? isDisabled : respostaBarrada}
@@ -1302,7 +1302,7 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer(
             <Button
               type="button"
               size="icon"
-              className="shrink-0"
+              className="shrink-0 rounded-full"
               onClick={handleSubmit}
               disabled={(mode === "note" ? isDisabled : envioBarrado) || !text.trim()}
               aria-label={t("Enviar")}

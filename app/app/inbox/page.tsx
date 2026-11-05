@@ -45,7 +45,11 @@ export default async function InboxPage({
   // mesmo motivo do `sidebar_collapsed` (`app/app/layout.tsx`): sem isto o
   // primeiro render traz o painel aberto e a grade só se ajusta depois da
   // hidratação — a conversa nasce estreita e pula para larga.
-  const painelRecolhido = (await cookies()).get("inbox_painel_recolhido")?.value === "1";
+  //
+  // O PADRÃO É RECOLHIDO: sem cookie (primeira visita) a conversa ganha a largura
+  // toda, que é o que ela precisa em telas de 1280–1440px. Quem quer a ficha à
+  // mostra abre uma vez — `togglePainelDoContato` grava "0" e a escolha fica.
+  const painelRecolhido = (await cookies()).get("inbox_painel_recolhido")?.value !== "0";
   // A LATERAL DESTA PESSOA (#3008): quais módulos e em que ordem. Vem do
   // metadata da própria pessoa, lido no servidor pela mesma razão do recolhido
   // acima — a lateral não pode nascer completa e "pular" para a escolhida

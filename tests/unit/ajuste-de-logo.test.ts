@@ -89,12 +89,12 @@ function pngComMargemTransparente(): Uint8Array<ArrayBuffer> {
 }
 
 describe("ajustarLogo — cortar e reduzir ANTES de deixar o teto de 512 KB decidir", () => {
-  it("arquivo dentro do teto passa reto: o MESMO File, sem acordar o motor", async () => {
+  it("arquivo dentro do teto e SEM margem passa reto: o MESMO File, sem reencodar", async () => {
     const motor = {
       inspecionar: vi.fn(motorDePngSintetico.inspecionar),
       reencodar: vi.fn(motorDePngSintetico.reencodar),
     };
-    const dentro = arquivoDe("mini.png", montarPng(64, 64, ruidoQuantizado(64, 64, 7)));
+    const dentro = arquivoDe("mini.png", montarPng(64, 64, opaco(ruidoQuantizado(64, 64, 7))));
     expect(dentro.size).toBeLessThan(LIMITE);
 
     const resultado = await ajustarLogo(dentro, motor);
@@ -102,8 +102,72 @@ describe("ajustarLogo — cortar e reduzir ANTES de deixar o teto de 512 KB deci
     expect(resultado.arquivo).toBe(dentro);
     expect(resultado.ajustado).toBe(false);
     expect(resultado.recusar).toBe(false);
-    expect(motor.inspecionar).not.toHaveBeenCalled();
+    // O motor olha (para saber se há margem), mas nada é regravado.
     expect(motor.reencodar).not.toHaveBeenCalled();
+  });
+
+  it("arquivo dentro do teto COM margem transparente grande é recortado na caixa útil", async () => {
+    // O caso do logo exportado numa folha grande: cabe no teto, mas o desenho ocupa
+    // só o miolo e fica minúsculo na barra lateral.
+    const [largura, altura] = [320, 240];
+    const caixa: Caixa = { x: 40, y: 90, largura: 240, altura: 60 };
+    const rgba = ruidoQuantizado(largura, altura, 0x1660);
+    for (let y = 0; y < altura; y++) {
+      for (let x = 0; x < largura; x++) {
+        const dentro =
+          x >= caixa.x && x < caixa.x + caixa.largura && y >= caixa.y && y < caixa.y + caixa.altura;
+        rgba[(y * largura + x) * 4 + 3] = dentro ? 255 : 0;
+      }
+    }
+    const original = arquivoDe("folha-grande.png", montarPng(largura, altura, rgba));
+    expect(original.size, "o caso: JÁ cabe no teto").toBeLessThan(LIMITE);
+
+    const resultado = await ajustarLogo(original, motorDePngSintetico);
+
+    expect(resultado.ajustado).toBe(true);
+    expect(resultado.recusar).toBe(false);
+    expect(resultado.arquivo).not.toBe(original);
+    const cortado = lerPng(new Uint8Array(await resultado.arquivo.arrayBuffer()));
+    expect({ largura: cortado.largura, altura: cortado.altura }).toEqual({
+      largura: caixa.largura,
+      altura: caixa.altura,
+    });
+  });
+
+  it("margem PEQUENA (respiro de 3%) não justifica regravar: passa reto", async () => {
+    const [largura, altura] = [200, 100];
+    const rgba = ruidoQuantizado(largura, altura, 0x1661);
+    for (let y = 0; y < altura; y++) {
+      for (let x = 0; x < largura; x++) {
+        const dentro = x >= 3 && x < largura - 3 && y >= 3 && y < altura - 3;
+        rgba[(y * largura + x) * 4 + 3] = dentro ? 255 : 0;
+      }
+    }
+    const original = arquivoDe("respiro.png", montarPng(largura, altura, rgba));
+    const motor = {
+      inspecionar: vi.fn(motorDePngSintetico.inspecionar),
+      reencodar: vi.fn(motorDePngSintetico.reencodar),
+    };
+
+    const resultado = await ajustarLogo(original, motor);
+
+    expect(resultado.arquivo).toBe(original);
+    expect(resultado.ajustado).toBe(false);
+    expect(motor.reencodar).not.toHaveBeenCalled();
+  });
+
+  it("dentro do teto, se o motor falhar, o original segue — o ajuste é um favor, não uma recusa", async () => {
+    const original = arquivoDe("mini.png", montarPng(64, 64, ruidoQuantizado(64, 64, 9)));
+    const motorQuebrado = {
+      inspecionar: vi.fn().mockRejectedValue(new Error("sem canvas")),
+      reencodar: vi.fn(),
+    };
+
+    const resultado = await ajustarLogo(original, motorQuebrado);
+
+    expect(resultado.arquivo).toBe(original);
+    expect(resultado.ajustado).toBe(false);
+    expect(resultado.recusar).toBe(false);
   });
 
   it("PNG de 1536×1024 com o logo só no meio → recorta na caixa útil, cabe no teto e preserva o alfa", async () => {

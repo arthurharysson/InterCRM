@@ -853,7 +853,7 @@ export function InboxLayout({
 
   // Altura da grade: a conta desconta TUDO que fica acima e abaixo dela.
   //   --faixas-de-cima  as faixas do topo (canal caído etc., `FaixasDeCima`)
-  //   3.5rem            TopBar (`h-14`, em components/shell/TopBar.tsx)
+  //   4rem              TopBar (`h-16`, em components/shell/TopBar.tsx)
   //   2 * --space-6     padding do <main> do AppShell (`p-6`, em cima e embaixo)
   //
   // Com `100vh-3.5rem` o padding ficava de fora e a grade media 48px a MAIS que a
@@ -897,7 +897,13 @@ export function InboxLayout({
     <div
       ref={gradeRef}
       className={cn(
-        "grid relative h-[calc(100dvh-var(--faixas-de-cima,0px)-3.5rem-var(--space-6)-max(var(--space-6),var(--rodape-ocupado,0px)))] w-full grid-cols-1 md:grid-cols-[300px_1fr]",
+        "grid relative h-[calc(100dvh-var(--faixas-de-cima,0px)-4rem-var(--space-6)-max(var(--space-6),var(--rodape-ocupado,0px)))] w-full grid-cols-1 md:grid-cols-[300px_1fr] md:gap-3",
+        // ALTURA DOS CARTÕES (md+): o vão em volta cai de 24px para 8px, e a grade
+        // ignora a reserva do rodapé — quem a respeita são os cartões que a peça fixa
+        // (o "Ramal conectado", no canto de baixo à direita) realmente cobre, abaixo.
+        // As margens negativas devolvem 16px em cima e o que a casca reservou embaixo
+        // (`padding-bottom` do `<main>`), senão a página ganharia rolagem à toa.
+        "md:-mt-4 md:-mb-[max(1rem,var(--rodape-ocupado,0px))] md:h-[calc(100dvh-var(--faixas-de-cima,0px)-4rem-1rem)]",
         // Recolhido (issue #3004), a terceira trilha vira o trilho estreito do
         // botão de expandir e a conversa fica com o que era da ficha. Duas
         // listas em vez de uma classe com valor em variável: o Tailwind precisa
@@ -946,7 +952,9 @@ export function InboxLayout({
       <div
         ref={listaRef}
         className={cn(
-          "h-full min-h-0 flex-col border-r border-border md:flex",
+          // Cartão flutuante a partir do `md` (desenho aprovado em nov/2026): a divisória de
+          // linha (`border-r`) virou o vão `md:gap-3` da grade + a borda e a sombra do cartão.
+          "h-full min-h-0 flex-col md:flex md:overflow-hidden md:rounded-2xl md:border md:border-border md:bg-card md:shadow-sm",
           colunas.lista,
         )}
       >
@@ -1004,7 +1012,15 @@ export function InboxLayout({
         ref={conversaRef}
         data-teclado-aberto={tecladoAberto ? "" : undefined}
         className={cn(
-          "h-full min-h-0 min-w-0 flex-col md:flex group/conversa",
+          "h-full min-h-0 min-w-0 flex-col md:flex group/conversa md:overflow-hidden md:rounded-2xl md:border md:border-border md:bg-card md:shadow-sm",
+          // O ramal (FAB de 48px no canto de baixo à direita) não reserva rodapé em
+          // repouso. Onde a conversa é a última coluna e o botão cairia em cima do
+          // "enviar" (entre md e xl, sem ficha ao lado), ela deixa 3.5rem livres;
+          // num painel de chamada aberto, a reserva declarada (`--rodape-ocupado`) manda.
+          // Em xl com a ficha em trilho, o FAB cai sobre o trilho e não toca o chat.
+          painelRecolhido
+            ? "md:max-xl:max-h-[calc(100%_-_max(3.5rem,var(--rodape-ocupado,0px)_-_0.5rem))] xl:max-h-[calc(100%_-_max(0px,var(--rodape-ocupado,0px)_-_0.5rem))]"
+            : "md:max-xl:max-h-[calc(100%_-_max(3.5rem,var(--rodape-ocupado,0px)_-_0.5rem))]",
           colunas.conversa,
         )}
       >
@@ -1179,7 +1195,7 @@ export function InboxLayout({
         )}
       </div>
 
-      <div className="hidden h-full min-h-0 min-w-0 xl:block">
+      <div className="hidden h-full min-h-0 min-w-0 xl:block xl:overflow-hidden xl:rounded-2xl xl:border xl:border-border xl:bg-card xl:shadow-sm xl:max-h-[calc(100%_-_max(0px,var(--rodape-ocupado,0px)_-_0.5rem))]">
         <CRMSidePanel
           conversation={selectedConversation}
           recolhido={painelRecolhido}
@@ -1215,7 +1231,8 @@ export function InboxLayout({
             onDoubleClick={restaurarPadrao}
             onKeyDown={(evento) => teclarNaDivisoria("lista", evento)}
             className="group absolute inset-y-0 z-10 flex w-2 -translate-x-1/2 cursor-col-resize touch-none select-none items-stretch justify-center focus-visible:outline-hidden"
-            style={{ left: `${efetivas.lista}px` }}
+            // +6px: a alça fica no MEIO do vão de 12px entre os cartões, não na borda do da lista.
+            style={{ left: `${efetivas.lista + 6}px` }}
           >
             <span
               aria-hidden
@@ -1237,7 +1254,7 @@ export function InboxLayout({
               onDoubleClick={restaurarPadrao}
               onKeyDown={(evento) => teclarNaDivisoria("ficha", evento)}
               className="group absolute inset-y-0 z-10 flex w-2 translate-x-1/2 cursor-col-resize touch-none select-none items-stretch justify-center focus-visible:outline-hidden"
-              style={{ right: `${efetivas.ficha}px` }}
+              style={{ right: `${efetivas.ficha + 6}px` }}
             >
               <span
                 aria-hidden

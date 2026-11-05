@@ -285,7 +285,7 @@ export function ChatThread({
       <div ref={scrollerRef} role="region" aria-label={t("Mensagens da conversa")} tabIndex={0}
         onScroll={scroll.onScroll} onWheel={scroll.onWheel} onTouchMove={scroll.onTouchMove}
         onPointerDown={scroll.onPointerDown} onKeyDown={scroll.onKeyDown}
-        className="min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-contain py-2">
+        className="min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-contain bg-muted/30 py-3">
         <div ref={contentRef}>
         {q.hasNextPage && (
           <div className="flex justify-center py-2">

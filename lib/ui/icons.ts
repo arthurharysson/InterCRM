@@ -22,6 +22,7 @@ export {
   Sparkle,
   ShieldCheck,
   Gear,
+  SidebarSimple,
   House,
   // admin platform
   Buildings,

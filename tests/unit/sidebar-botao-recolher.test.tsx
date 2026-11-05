@@ -61,7 +61,7 @@ function comoPapel(role: ActiveOrg["role"]) {
 }
 
 function linhaDaLogo(): Element | null {
-  return document.querySelector(".h-14");
+  return document.querySelector(".h-16");
 }
 
 function rodape(): Element | null {
@@ -153,8 +153,8 @@ describe("Sidebar — a marca não disputa a barra com o botão (#2722 / review 
     const img = document.querySelector("img")!;
     // O review provou a pegadinha: `max-w-full` + `max-w-[10rem]` disputam a
     // MESMA propriedade e só um vale. O teto tem de ser um único `min()`.
-    expect(img.className).toContain("max-w-[min(10rem,100%)]");
-    expect(img.className).not.toContain("max-w-[10rem]");
+    expect(img.className).toContain("max-w-[min(11rem,100%)]");
+    expect(img.className).not.toContain("max-w-[11rem]");
     // `min-w-0` porque item de flex não encolhe abaixo do `min-width: auto`.
     expect(img.parentElement?.className).toContain("min-w-0");
   });

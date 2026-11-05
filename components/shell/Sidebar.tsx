@@ -3,7 +3,7 @@ import Link from "next/link";
 import { useT } from "@/hooks/i18n/useT";
 import { usePathname } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
-import { ArrowRight, BookOpen, CaretDoubleLeft, CaretDoubleRight, CaretDown, Gear } from "@/lib/ui/icons";
+import { ArrowRight, BookOpen, CaretDown, Gear, SidebarSimple } from "@/lib/ui/icons";
 import { cn } from "@/lib/utils";
 import { toggleSidebar } from "@/app/actions/shell/toggleSidebar";
 import { useAuth } from "@/hooks/auth/AuthProvider";
@@ -19,6 +19,38 @@ import { GRUPO_NO_RODAPE, sidebarGroups } from "@/lib/navigation/registry";
 import { usePrefetchPorIntencao } from "@/hooks/navigation/prefetchPorIntencao";
 
 const CHAVE_GRUPOS_FECHADOS = "sidebar-grupos-fechados";
+
+/**
+ * O desenho de UM destino do menu — itens, hub do grupo, Configurações e Ajuda
+ * saem daqui. Eram quatro cópias do mesmo `cn(...)`, e rodapé com um peso
+ * diferente do corpo lê-se como outro assunto.
+ *
+ * A COR vem toda de `--color-accent`, o token que a marca da organização
+ * sobrescreve (Configurações › Marca): item ativo, marcador lateral e contadores
+ * mudam juntos quando o revendedor põe a cor dele. Nada aqui é azul.
+ *
+ * A ALTURA É A DE SEMPRE — 28px, e o intervalo entre linhas caiu de 4px para 2px
+ * (`space-y-0.5` na lista). O e2e `navegacao.spec.ts` exige que o menu inteiro
+ * caiba em 1280×900 sem rolar (ver a nota de densidade mais abaixo), e o cartão
+ * flutuante gasta ~34px de moldura (16px de vão + borda + o que a marca ocupa):
+ * medido logado como admin, o menu PRECISA de ~715px sem a faixa do topo e, com
+ * linhas de 30px, faltavam 35. Linha de 28px + 2px de intervalo devolve 2px × as
+ * ~17 linhas. Recolhida, o destino vira uma pílula de 40×28 — não um quadrado de
+ * 44 —, pelo mesmo motivo.
+ */
+function classeDoDestino(ativo: boolean, collapsed: boolean): string {
+  return cn(
+    "relative flex items-center rounded-xl text-sm transition-colors",
+    // 40px de linha, como no desenho de referência. O menu inteiro NÃO cabe mais sem
+    // rolar em 900px: ele rola dentro da própria caixa (`navegacao.spec.ts`).
+    collapsed ? "mx-auto h-10 w-12 justify-center" : "h-10 gap-3 px-3.5",
+    // O ATIVO É UMA PÍLULA CHEIA na cor da marca (`bg-accent`), como no desenho de
+    // referência; o inativo é só traço fino e some no fundo até o hover.
+    ativo
+      ? "bg-accent font-medium text-accent-foreground shadow-sm"
+      : "text-muted-foreground hover:bg-muted hover:text-foreground",
+  );
+}
 
 interface SidebarContentProps {
   collapsed: boolean;
@@ -152,20 +184,20 @@ export function SidebarContent({
     <>
       <div
         className={cn(
-          "flex h-14 items-center border-b px-4",
+          "flex h-16 items-center border-b px-4",
           collapsed ? "justify-center" : "justify-start",
         )}
       >
         {(logo || logoEscuro) && !collapsed ? (
-          // Sem arte própria para o escuro, preserva a proteção de contraste.
+          // SEM CAIXA BRANCA atrás do logo, por decisão do dono do produto: o logo é
+          // desenhado direto sobre a barra. Quem cuida do contraste no tema escuro é a
+          // arte para o escuro (Configurações › Marca); sem ela, uma arte pensada para
+          // fundo claro pode ficar pouco legível.
           <div
-            className={cn(
-              // `min-w-0`: item de flex não encolhe abaixo do `min-width: auto`,
-              // que é o valor padrão — sem isso, uma arte própria larga empurra o
-              // botão de recolher para fora da barra em vez de encolher.
-              "min-w-0 rounded-md",
-              !logoEscuro && "dark:bg-white dark:px-2 dark:py-1 dark:shadow-sm",
-            )}
+            // `min-w-0`: item de flex não encolhe abaixo do `min-width: auto`,
+            // que é o valor padrão — sem isso, uma arte própria larga empurra o
+            // botão de recolher para fora da barra em vez de encolher.
+            className="min-w-0"
           >
             {/* <img> em vez de next/image de propósito: a URL vem de quem hospeda
               (banco ou .env), e next/image exige allowlist de domínios fechada em
@@ -188,7 +220,10 @@ export function SidebarContent({
                   // `max-w-[10rem]` + `max-w-full` não valem os dois: disputam a
                   // MESMA propriedade no CSS e só um sobrevive — a pegadinha que o
                   // review apontou, e por isso o teto é um único `min()`.
-                  "h-7 w-auto max-w-[min(10rem,100%)] object-contain",
+                  //
+                  // O teto subiu de 10rem para 11rem: a linha passou a `px-4` e tem ~224px,
+                  // e o botão de recolher ocupa ~44 — sobram ~180px para o logo.
+                  "h-10 w-auto max-w-[min(11rem,100%)] object-contain",
                   logoEscuro && "dark:hidden",
                 )}
               />
@@ -207,7 +242,7 @@ export function SidebarContent({
               <img
                 src={logoEscuro}
                 alt={nome}
-                className="hidden h-7 w-auto max-w-[min(10rem,100%)] object-contain dark:block"
+                className="hidden h-10 w-auto max-w-[min(11rem,100%)] object-contain dark:block"
               />
             ) : null}
           </div>
@@ -320,7 +355,7 @@ export function SidebarContent({
         e nenhum destino novo apareceu aqui.
       */}
       <nav
-        className="flex-1 space-y-2 overflow-y-auto px-2 py-1"
+        className="flex-1 space-y-2 overflow-y-auto px-2.5 py-2"
         aria-label={t("Navegação principal")}
       >
         {grupos.map(({ group, items }) => {
@@ -340,7 +375,7 @@ export function SidebarContent({
                     type="button"
                     onClick={() => toggleGrupo(group.id)}
                     aria-expanded={aberto}
-                    className="flex w-full items-center justify-between rounded-md px-3 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent/40 hover:text-foreground"
+                    className="flex w-full items-center justify-between rounded-lg px-3.5 py-2 text-[11px] font-semibold tracking-widest text-text-subtle uppercase transition-colors hover:text-foreground"
                   >
                     {t(group.label)}
                     <CaretDown
@@ -359,7 +394,7 @@ export function SidebarContent({
                 <ul
                   aria-labelledby={collapsed ? undefined : tituloId}
                   aria-label={collapsed ? t(group.label) : undefined}
-                  className="space-y-1"
+                  className="space-y-0.5"
                 >
                   {items.map((item) => {
                     const isActive = pathname === item.href || pathname.startsWith(item.href + "/");
@@ -372,15 +407,9 @@ export function SidebarContent({
                           title={collapsed ? t(item.label) : undefined}
                           aria-current={isActive ? "page" : undefined}
                           onClick={onNavigate}
-                          className={cn(
-                            "relative flex items-center gap-3 rounded-md px-3 py-1 text-sm transition-colors",
-                            isActive
-                              ? "bg-accent text-accent-foreground"
-                              : "text-muted-foreground hover:bg-accent/50 hover:text-foreground",
-                            collapsed && "justify-center px-2",
-                          )}
+                          className={classeDoDestino(isActive, collapsed)}
                         >
-                          <Icon size={18} weight={isActive ? "fill" : "regular"} aria-hidden />
+                          <Icon size={20} weight={isActive ? "regular" : "light"} aria-hidden />
                           {!collapsed && <span className="truncate">{t(item.label)}</span>}
                           {item.healthDot && (
                             <ConnectionHealthDot
@@ -404,15 +433,9 @@ export function SidebarContent({
                         title={collapsed ? t(group.hub.label) : undefined}
                         aria-current={pathname === group.hub.href ? "page" : undefined}
                         onClick={onNavigate}
-                        className={cn(
-                          "flex items-center gap-3 rounded-md px-3 py-1 text-sm transition-colors",
-                          pathname === group.hub.href
-                            ? "bg-accent text-accent-foreground"
-                            : "text-muted-foreground hover:bg-accent/50 hover:text-foreground",
-                          collapsed && "justify-center px-2",
-                        )}
+                        className={classeDoDestino(pathname === group.hub.href, collapsed)}
                       >
-                        <ArrowRight size={18} aria-hidden />
+                        <ArrowRight size={20} weight="light" aria-hidden />
                         {!collapsed && <span className="truncate">{t(group.hub.label)}</span>}
                       </Link>
                     </li>
@@ -431,15 +454,9 @@ export function SidebarContent({
             title={collapsed ? t(rodape.label) : undefined}
             aria-current={pathname.startsWith(rodape.href) ? "page" : undefined}
             onClick={onNavigate}
-            className={cn(
-              "mb-0.5 flex items-center gap-3 rounded-md px-3 py-1 text-sm transition-colors",
-              pathname.startsWith(rodape.href)
-                ? "bg-accent text-accent-foreground"
-                : "text-muted-foreground hover:bg-accent/50 hover:text-foreground",
-              collapsed && "justify-center px-2",
-            )}
+            className={cn("mb-0.5", classeDoDestino(pathname.startsWith(rodape.href), collapsed))}
           >
-            <Gear size={18} aria-hidden />
+            <Gear size={20} weight="light" aria-hidden />
             {!collapsed && <span className="truncate">{t(rodape.label)}</span>}
           </Link>
         )}
@@ -454,15 +471,9 @@ export function SidebarContent({
             title={collapsed ? t(ajuda.label) : undefined}
             aria-current={pathname.startsWith(ajuda.href) ? "page" : undefined}
             onClick={onNavigate}
-            className={cn(
-              "mb-0.5 flex items-center gap-3 rounded-md px-3 py-1 text-sm transition-colors",
-              pathname.startsWith(ajuda.href)
-                ? "bg-accent text-accent-foreground"
-                : "text-muted-foreground hover:bg-accent/50 hover:text-foreground",
-              collapsed && "justify-center px-2",
-            )}
+            className={cn("mb-0.5", classeDoDestino(pathname.startsWith(ajuda.href), collapsed))}
           >
-            <BookOpen size={18} aria-hidden />
+            <BookOpen size={20} weight="light" aria-hidden />
             {!collapsed && <span className="truncate">{t(ajuda.label)}</span>}
           </Link>
         )}
@@ -507,17 +518,14 @@ function BotaoDeRecolher({
       onClick={onClick}
       disabled={isPending}
       className={cn(
-        "flex w-full items-center gap-2 rounded-md px-3 py-2 text-xs text-muted-foreground hover:bg-accent/50 hover:text-foreground",
+        "flex w-full items-center gap-2 rounded-xl px-3 py-2 text-xs text-muted-foreground hover:bg-muted hover:text-foreground",
         (collapsed || soIcone) && "justify-center px-2",
       )}
       aria-label={rotulo}
       title={collapsed || soIcone ? rotulo : undefined}
     >
-      {collapsed ? (
-        <CaretDoubleRight size={14} aria-hidden />
-      ) : (
-        <CaretDoubleLeft size={14} aria-hidden />
-      )}
+      {/* O mesmo ícone de "painel lateral" nos dois estados: o gesto é abrir/fechar a barra. */}
+      <SidebarSimple size={20} weight="light" aria-hidden className={collapsed ? "rotate-180" : undefined} />
       {!collapsed && !soIcone && <span>{t("Recolher")}</span>}
     </button>
   );
@@ -562,11 +570,23 @@ export function Sidebar({ collapsed }: { collapsed: boolean }) {
         // `duration-base` em vez do `duration-200` literal: 200ms é o mesmo
         // número, mas vindo de `--duration-base`. A Lei de movimento fecha a
         // tabela de durações, e número solto é o que a faz apodrecer.
-        "sticky top-[var(--faixas-de-cima,0px)] z-30 flex h-[calc(100dvh-var(--faixas-de-cima,0px))] shrink-0 flex-col border-r bg-card transition-[width] duration-base",
-        collapsed ? "w-16" : "w-60",
+        "sticky top-[var(--faixas-de-cima,0px)] z-30 flex h-[calc(100dvh-var(--faixas-de-cima,0px))] shrink-0 transition-[width] duration-base",
+        // Encostada na borda da janela, com a linha divisória à direita (o `border-r`
+        // do painel de dentro faz parte destas larguras): 256px aberta, 64px recolhida. Mais larga que isto, a conversa com a ficha
+        // aberta passa do espaço em 1280px e o `<main>` ganha barra de rolagem horizontal.
+        collapsed ? "w-16" : "w-64",
       )}
     >
-      <SidebarContent collapsed={collapsed} />
+      {/*
+        A barra FLUTUA por dentro, não por fora: o `aside` continua `sticky` e
+        ocupando lugar na linha (as cercas `barra-lateral-nao-flutua` existem por
+        causa de uma barra `fixed` que passou por cima da lista de conversas), e o
+        que parece solto é um cartão arredondado dentro dele. O `p-2` é o vão entre
+        o cartão, a borda da janela e o conteúdo.
+      */}
+      <div className="flex h-full w-full min-w-0 flex-col overflow-hidden border-r bg-card">
+        <SidebarContent collapsed={collapsed} />
+      </div>
     </aside>
   );
 }

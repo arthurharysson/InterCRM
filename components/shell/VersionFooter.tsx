@@ -40,8 +40,15 @@ export function VersionFooter({
       className={cn("px-3 py-1 text-[11px] text-muted-foreground", collapsed && "px-0 text-center")}
       title={titulo}
     >
-      {collapsed && label ? label.split(".").slice(0, 2).join(".") : titulo}
-      {data.identity && data.identity.status !== "confirmed" && (
+      {/* Na barra recolhida (64px) só cabe o número curto. Sem versão confirmada não há
+          número: a frase longa quebrava em quatro linhas por cima do rodapé, então ela
+          fica só no `title` e para o leitor de tela. */}
+      {collapsed ? (
+        label ? label.split(".").slice(0, 2).join(".") : <span className="sr-only">{titulo}</span>
+      ) : (
+        titulo
+      )}
+      {!collapsed && data.identity && data.identity.status !== "confirmed" && (
         <span className="block text-[10px]">{t("Execução não confirmada")}</span>
       )}
     </p>

@@ -340,7 +340,7 @@ export function MessageBubble({
     <div
       data-search-match={searchMatch || undefined}
       className={cn(
-        "group flex w-full min-w-0 items-center gap-1 px-4 py-1",
+        "group flex w-full min-w-0 items-center gap-1 px-5 py-1",
         isOutbound ? "justify-end" : "justify-start",
       )}
     >
@@ -355,14 +355,14 @@ export function MessageBubble({
           isBareSticker
             ? "px-0 py-0"
             : cn(
-                "rounded-2xl px-3 py-2 shadow-sm",
+                "rounded-2xl px-3.5 py-2.5 shadow-sm",
                 temMenu && "pr-8",
                 // A área de toque da seta ocupa 48px. O documento precisa
                 // terminar antes dela, inclusive quando o cartão encolhe.
                 temMenu && cartaoDeDocumentoVisivel && "pointer-coarse:pr-12 pointer-coarse:max-w-[85%]",
                 isOutbound
                   ? "rounded-br-sm bg-primary text-primary-foreground"
-                  : "rounded-bl-sm bg-muted text-foreground",
+                  : "rounded-bl-sm border border-border bg-card text-foreground",
               ),
           // O pulo da agenda não é falha: o selo diz isso, e a moldura de erro
           // diria o contrário (#3850).

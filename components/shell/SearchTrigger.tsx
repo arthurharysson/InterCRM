@@ -19,12 +19,14 @@ export function SearchTrigger() {
       <Button
         variant="outline"
         size="sm"
-        className="gap-2 text-muted-foreground"
+        // Uma pílula larga, como no desenho de referência: ocupa o espaço que a
+        // coluna da busca oferece (até `max-w-md`) e empurra o atalho para a direita.
+        className="gap-2 text-muted-foreground md:h-10 md:w-full md:justify-start md:rounded-full md:px-4"
         onClick={() => setOpen(true)}
       >
-        <MagnifyingGlass size={14} aria-hidden />
+        <MagnifyingGlass size={16} aria-hidden />
         <span className="max-md:sr-only">{t("Buscar...")}</span>
-        <kbd className="ml-2 hidden md:inline rounded-md border bg-muted px-1.5 py-0.5 text-[10px]">⌘K</kbd>
+        <kbd className="ml-auto hidden md:inline rounded-md border bg-muted px-1.5 py-0.5 text-[10px]">⌘K</kbd>
       </Button>
       <CommandPalette open={open} onOpenChange={setOpen} />
     </>

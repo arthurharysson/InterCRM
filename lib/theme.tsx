@@ -2,8 +2,19 @@
 
 import * as React from "react";
 
-export type Theme = "light" | "dark" | "system";
-export type ResolvedTheme = "light" | "dark";
+/**
+ * O TEMA É ESCOLHA MANUAL — nunca o do navegador (decisão do dono do produto, nov/2026).
+ *
+ * Até então havia um terceiro valor, `"system"`, que seguia `prefers-color-scheme` e era o
+ * PADRÃO de quem nunca clicou: o CRM abria escuro só porque o Windows estava escuro, e quem
+ * vende o sistema com a cara da marca do cliente não quer que a primeira tela dependa do
+ * sistema operacional de quem abre. Agora o padrão é o claro, e só vira escuro quem escolher
+ * no botão do menu do usuário (a escolha fica salva neste navegador).
+ *
+ * Valor `"system"` que já esteja salvo no `localStorage` de alguém é lido como claro.
+ */
+export type Theme = "light" | "dark";
+export type ResolvedTheme = Theme;
 
 // Exportada para o teste reusar em vez de duplicar o literal — duplicar
 // acionaria `tests/unit/branding.test.ts` (a mesma marca hardcoded, fora da
@@ -11,9 +22,9 @@ export type ResolvedTheme = "light" | "dark";
 export const STORAGE_KEY = "deskcomm-theme";
 
 type ThemeContextValue = {
-  /** User preference: light, dark, or system. */
+  /** Escolha manual da pessoa: claro ou escuro. */
   theme: Theme;
-  /** Effective theme applied to the DOM (system collapsed to light/dark). */
+  /** O tema aplicado ao DOM. Igual a `theme` — mantido porque há consumidores dos dois nomes. */
   resolvedTheme: ResolvedTheme;
   setTheme: (theme: Theme) => void;
   toggle: () => void;
@@ -22,19 +33,14 @@ type ThemeContextValue = {
 const ThemeContext = React.createContext<ThemeContextValue | null>(null);
 
 function readStoredTheme(): Theme {
-  if (typeof window === "undefined") return "system";
-  try {
-    const v = window.localStorage.getItem(STORAGE_KEY);
-    if (v === "light" || v === "dark" || v === "system") return v;
-  } catch {
-    // localStorage indisponível (modo privado, sandbox) — segue com default.
-  }
-  return "system";
-}
-
-function getSystemTheme(): ResolvedTheme {
   if (typeof window === "undefined") return "light";
-  return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+  try {
+    // Só "dark" escolhe o escuro. Ausente, "light" ou o antigo "system" = claro.
+    return window.localStorage.getItem(STORAGE_KEY) === "dark" ? "dark" : "light";
+  } catch {
+    // localStorage indisponível (modo privado, sandbox) — segue com o padrão.
+    return "light";
+  }
 }
 
 function applyTheme(resolved: ResolvedTheme) {
@@ -78,7 +84,7 @@ function getTemaSnapshot(): Theme {
   return temaEmCache;
 }
 function getTemaSnapshotDoServidor(): Theme {
-  return "system";
+  return "light";
 }
 function inscreverEmTema(ouvinte: Ouvinte): () => void {
   ouvintesDeTema.add(ouvinte);
@@ -94,40 +100,11 @@ function gravarTema(next: Theme) {
   ouvintesDeTema.forEach((ouvinte) => ouvinte());
 }
 
-const ouvintesDeSistema = new Set<Ouvinte>();
-let sistemaEmCache: ResolvedTheme | null = null;
-
-function getSistemaSnapshot(): ResolvedTheme {
-  if (sistemaEmCache === null) sistemaEmCache = getSystemTheme();
-  return sistemaEmCache;
-}
-function getSistemaSnapshotDoServidor(): ResolvedTheme {
-  return "light";
-}
-function inscreverEmSistema(ouvinte: Ouvinte): () => void {
-  if (ouvintesDeSistema.size === 0 && typeof window !== "undefined") {
-    // Só liga UM listener nativo, mesmo com N componentes inscritos — o
-    // fan-out para os `ouvinte()` é responsabilidade deste módulo.
-    const mql = window.matchMedia("(prefers-color-scheme: dark)");
-    const onChange = (e: MediaQueryListEvent) => {
-      sistemaEmCache = e.matches ? "dark" : "light";
-      ouvintesDeSistema.forEach((o) => o());
-    };
-    mql.addEventListener("change", onChange);
-  }
-  ouvintesDeSistema.add(ouvinte);
-  return () => ouvintesDeSistema.delete(ouvinte);
-}
-
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const theme = React.useSyncExternalStore(inscreverEmTema, getTemaSnapshot, getTemaSnapshotDoServidor);
-  const systemTheme = React.useSyncExternalStore(
-    inscreverEmSistema,
-    getSistemaSnapshot,
-    getSistemaSnapshotDoServidor,
-  );
 
-  const resolvedTheme: ResolvedTheme = theme === "system" ? systemTheme : theme;
+  // Sem "sistema": o tema aplicado é exatamente o que a pessoa escolheu.
+  const resolvedTheme: ResolvedTheme = theme;
 
   // Aplica no DOM sempre que o tema efetivo muda. Isto não é "ler estado
   // externo" (o que o external store acima já cobre) — é o único jeito de
@@ -143,9 +120,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const toggle = React.useCallback(() => {
-    const atual = getTemaSnapshot();
-    const resolvidoAtual = atual === "system" ? getSistemaSnapshot() : atual;
-    gravarTema(resolvidoAtual === "dark" ? "light" : "dark");
+    gravarTema(getTemaSnapshot() === "dark" ? "light" : "dark");
   }, []);
 
   const value = React.useMemo<ThemeContextValue>(
