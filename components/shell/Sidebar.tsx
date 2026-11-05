@@ -3,7 +3,7 @@ import Link from "next/link";
 import { useT } from "@/hooks/i18n/useT";
 import { usePathname } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
-import { ArrowRight, BookOpen, CaretDoubleLeft, CaretDoubleRight, CaretDown, Gear } from "@/lib/ui/icons";
+import { ArrowRight, BookOpen, CaretDown, Gear, SidebarSimple } from "@/lib/ui/icons";
 import { cn } from "@/lib/utils";
 import { toggleSidebar } from "@/app/actions/shell/toggleSidebar";
 import { useAuth } from "@/hooks/auth/AuthProvider";
@@ -41,11 +41,12 @@ const CHAVE_GRUPOS_FECHADOS = "sidebar-grupos-fechados";
 function classeDoDestino(ativo: boolean, collapsed: boolean): string {
   return cn(
     "relative flex items-center rounded-xl text-sm transition-colors",
-    collapsed ? "mx-auto h-7 w-10 justify-center" : "h-7 gap-3 px-3",
+    // 28px de linha: o menu inteiro tem de caber em 1280×900 sem rolar (`navegacao.spec.ts`).
+    collapsed ? "mx-auto h-7 w-11 justify-center" : "h-7 gap-3 px-3",
+    // O ATIVO É UMA PÍLULA CHEIA na cor da marca (`bg-accent`), como no desenho de
+    // referência; o inativo é só traço fino e some no fundo até o hover.
     ativo
-      ? collapsed
-        ? "bg-accent text-accent-foreground shadow-sm"
-        : "bg-accent/10 font-medium text-accent before:absolute before:top-1.5 before:bottom-1.5 before:-left-2 before:w-1 before:rounded-r-full before:bg-accent"
+      ? "bg-accent font-medium text-accent-foreground shadow-sm"
       : "text-muted-foreground hover:bg-muted hover:text-foreground",
   );
 }
@@ -350,7 +351,7 @@ export function SidebarContent({
         e nenhum destino novo apareceu aqui.
       */}
       <nav
-        className="flex-1 space-y-1 overflow-y-auto px-2 py-1"
+        className="flex-1 space-y-1 overflow-y-auto px-3 py-1"
         aria-label={t("Navegação principal")}
       >
         {grupos.map(({ group, items }) => {
@@ -404,7 +405,7 @@ export function SidebarContent({
                           onClick={onNavigate}
                           className={classeDoDestino(isActive, collapsed)}
                         >
-                          <Icon size={18} weight={isActive ? "fill" : "regular"} aria-hidden />
+                          <Icon size={20} weight={isActive ? "regular" : "light"} aria-hidden />
                           {!collapsed && <span className="truncate">{t(item.label)}</span>}
                           {item.healthDot && (
                             <ConnectionHealthDot
@@ -430,7 +431,7 @@ export function SidebarContent({
                         onClick={onNavigate}
                         className={classeDoDestino(pathname === group.hub.href, collapsed)}
                       >
-                        <ArrowRight size={18} aria-hidden />
+                        <ArrowRight size={20} weight="light" aria-hidden />
                         {!collapsed && <span className="truncate">{t(group.hub.label)}</span>}
                       </Link>
                     </li>
@@ -451,7 +452,7 @@ export function SidebarContent({
             onClick={onNavigate}
             className={cn("mb-0.5", classeDoDestino(pathname.startsWith(rodape.href), collapsed))}
           >
-            <Gear size={18} aria-hidden />
+            <Gear size={20} weight="light" aria-hidden />
             {!collapsed && <span className="truncate">{t(rodape.label)}</span>}
           </Link>
         )}
@@ -468,7 +469,7 @@ export function SidebarContent({
             onClick={onNavigate}
             className={cn("mb-0.5", classeDoDestino(pathname.startsWith(ajuda.href), collapsed))}
           >
-            <BookOpen size={18} aria-hidden />
+            <BookOpen size={20} weight="light" aria-hidden />
             {!collapsed && <span className="truncate">{t(ajuda.label)}</span>}
           </Link>
         )}
@@ -519,11 +520,8 @@ function BotaoDeRecolher({
       aria-label={rotulo}
       title={collapsed || soIcone ? rotulo : undefined}
     >
-      {collapsed ? (
-        <CaretDoubleRight size={14} aria-hidden />
-      ) : (
-        <CaretDoubleLeft size={14} aria-hidden />
-      )}
+      {/* O mesmo ícone de "painel lateral" nos dois estados: o gesto é abrir/fechar a barra. */}
+      <SidebarSimple size={20} weight="light" aria-hidden className={collapsed ? "rotate-180" : undefined} />
       {!collapsed && !soIcone && <span>{t("Recolher")}</span>}
     </button>
   );
@@ -568,10 +566,10 @@ export function Sidebar({ collapsed }: { collapsed: boolean }) {
         // `duration-base` em vez do `duration-200` literal: 200ms é o mesmo
         // número, mas vindo de `--duration-base`. A Lei de movimento fecha a
         // tabela de durações, e número solto é o que a faz apodrecer.
-        "sticky top-[var(--faixas-de-cima,0px)] z-30 flex h-[calc(100dvh-var(--faixas-de-cima,0px))] shrink-0 p-2 transition-[width] duration-base",
-        // A largura INCLUI os 8px de respiro de cada lado: o cartão de dentro
-        // mede 240px aberto e 72px recolhido (eram 240 e 64, sem respiro).
-        collapsed ? "w-[5.5rem]" : "w-64",
+        "sticky top-[var(--faixas-de-cima,0px)] z-30 flex h-[calc(100dvh-var(--faixas-de-cima,0px))] shrink-0 transition-[width] duration-base",
+        // Encostada na borda da janela, com a linha divisória à direita (o `border-r`
+        // do painel de dentro faz parte destas larguras): 256px aberta, 72px recolhida.
+        collapsed ? "w-[4.5rem]" : "w-64",
       )}
     >
       {/*
@@ -581,7 +579,7 @@ export function Sidebar({ collapsed }: { collapsed: boolean }) {
         que parece solto é um cartão arredondado dentro dele. O `p-2` é o vão entre
         o cartão, a borda da janela e o conteúdo.
       */}
-      <div className="flex h-full w-full min-w-0 flex-col overflow-hidden rounded-2xl border bg-card shadow-md">
+      <div className="flex h-full w-full min-w-0 flex-col overflow-hidden border-r bg-card">
         <SidebarContent collapsed={collapsed} />
       </div>
     </aside>
