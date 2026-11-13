@@ -48,6 +48,7 @@ const FONTE: Record<ProviderDeMensagem, FonteDeTemplates | null> = {
   // rota própria (host/token do parceiro).
   datafy: "graph",
   web: null,
+  chat_externo: null,
 };
 
 /** `null` quando este canal não trabalha com definições aprovadas. */

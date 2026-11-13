@@ -144,6 +144,7 @@ describe("CONTROLE: os canais que já existiam continuam declarados", () => {
       "zernio_social",
       "datafy",
       "web", // canal do fork (InterSuite); os cinco do upstream seguem na frente
+      "chat_externo", // canal do fork (página de chat própria); outro provider, não toca o `web`
     ]);
     for (const provider of PROVIDERS_DE_MENSAGEM) {
       const caps = capabilitiesOf(provider);

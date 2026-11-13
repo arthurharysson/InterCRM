@@ -1,5 +1,7 @@
 import { ingestSocialInbound, socialPayloadBelongsToSession } from "./social/ingest";
-import { CHANNEL_PROVIDER_SOCIAL, CHANNEL_PROVIDER_WEB } from "./capabilities";
+import { CHANNEL_PROVIDER_CHAT_EXTERNO, CHANNEL_PROVIDER_SOCIAL, CHANNEL_PROVIDER_WEB } from "./capabilities";
+import { assinaturaConfere, lerEventoDoChat } from "./chat-externo/contrato";
+import { ingerirEventoDoChat } from "./chat-externo/ingest";
 import { ingestWebInbound, parseWebPayload, verifyWebSignature } from "./web/ingest";
 import { HEADER_ASSINATURA_DE_ENTRADA } from "@/lib/webhooks/assinatura";
 /**
@@ -89,6 +91,8 @@ export function acceptsInboundWebhook(provider: string): boolean {
   // existe — nem para quem tem o token de uma sessão gravada antes.
   if (provider === CHANNEL_PROVIDER_DATAFY) return canalGraphParceiroLigado();
   if (provider === CHANNEL_PROVIDER_WEB) return Boolean(process.env.INTERSUITE_HMAC_SECRET_OUT);
+  // O Chat externo tem segredo POR CANAL (na própria sessão): não depende de variável de ambiente.
+  if (provider === CHANNEL_PROVIDER_CHAT_EXTERNO) return true;
   return provider === CHANNEL_PROVIDER_ZERNIO || provider === CHANNEL_PROVIDER_SOCIAL;
 }
 
@@ -101,6 +105,9 @@ export function verifyInboundWebhookSignature(provider: string, raw: string, hea
     return verifyWebSignature(raw, headers.get(HEADER_ASSINATURA_DE_ENTRADA), webSecret);
   }
   if (!secret || secret.length < MIN_SECRET_LEN) return false;
+  if (provider === CHANNEL_PROVIDER_CHAT_EXTERNO) {
+    return assinaturaConfere(raw, headers.get(HEADER_ASSINATURA_DE_ENTRADA), secret);
+  }
   // Cada canal assina do seu jeito; o esquema do Datafy está em `graph-parceiro/webhook`.
   if (provider === CHANNEL_PROVIDER_DATAFY) {
     return verifyGraphPartnerSignature(raw, headers.get(HEADER_ASSINATURA), headers.get(HEADER_TIMESTAMP), secret);
@@ -205,6 +212,8 @@ export async function handleInboundWebhook(
       return datafyInbound(admin, input);
     case CHANNEL_PROVIDER_WEB:
       return webInbound(admin, input);
+    case CHANNEL_PROVIDER_CHAT_EXTERNO:
+      return chatExternoInbound(admin, input);
     default:
       // Token de um canal que não entra por aqui. É configuração trocada, não
       // ataque — mas processar seria ler o payload com o parser errado.
@@ -465,6 +474,38 @@ async function datafyInbound(
   }
 
   return { ok: true, body: { received: eventos.length, outcomes: desfechos } };
+}
+
+async function chatExternoInbound(
+  admin: SupabaseClient,
+  input: InboundWebhookInput,
+): Promise<InboundWebhookOutcome> {
+  // Fail-closed: sem o segredo do canal (ou curto demais) não se aceita nada. A rota já conferiu a assinatura
+  // antes de arquivar o corpo; este ramo repete a guarda para quem chama sem passar por ela (reprocessamento).
+  if (!input.secret || input.secret.length < MIN_SECRET_LEN) {
+    return { ok: false, code: "unauthorized", message: "webhook_secret_unavailable" };
+  }
+  if (!assinaturaConfere(input.rawBody, input.headers.get(HEADER_ASSINATURA_DE_ENTRADA), input.secret)) {
+    return { ok: false, code: "unauthorized", message: "bad_signature" };
+  }
+
+  const leitura = lerEventoDoChat(input.rawBody);
+  if (!leitura.ok) {
+    if (leitura.motivo === "json_invalido") return { ok: false, code: "invalid_json", message: "invalid_json" };
+    // Nomeia os CAMPOS, nunca os valores (dado de cliente).
+    return {
+      ok: false,
+      code: "contrato_violado",
+      message: `payload fora do contrato do canal: ${leitura.campos.join(", ")}`,
+    };
+  }
+
+  const resultado = await ingerirEventoDoChat(admin, {
+    organizationId: input.session.organization_id,
+    channelSessionId: input.session.id,
+    evento: leitura.evento,
+  });
+  return { ok: true, body: { ...resultado } };
 }
 
 async function webInbound(

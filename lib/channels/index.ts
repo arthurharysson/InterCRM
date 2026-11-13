@@ -5,6 +5,7 @@
 import { datafyAdapter } from "./adapters/datafy";
 import { metaCloudAdapter } from "./adapters/meta-cloud";
 import { wahaAdapter } from "./adapters/waha";
+import { chatExternoAdapter } from "./adapters/chat-externo";
 import { webAdapter } from "./adapters/web";
 import { socialAdapter } from "./social/adapter";
 import { zernioAdapter } from "./adapters/zernio";
@@ -21,6 +22,7 @@ const ADAPTERS: Record<ProviderDeMensagem, ChannelAdapter | null> = {
   zernio_social: socialAdapter,
   datafy: datafyAdapter,
   web: webAdapter,
+  chat_externo: chatExternoAdapter,
 };
 
 /**
