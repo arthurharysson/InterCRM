@@ -319,6 +319,24 @@ export const corDaFilaSchema = z
   .regex(COR_DA_FILA, "A cor da fila precisa ser um hexadecimal de seis dígitos, como #1a2b3c.")
   .nullable();
 
+/**
+ * O CÓDIGO EXTERNO do setor (migration 9109): o nome curto com que um sistema de fora — o bot do WhatsApp — indica
+ * a fila de uma conversa (ex.: `suporte-tecnico`). Minúsculo, sem espaço, único por organização. Vazio vira `null`
+ * (apagar o código é intenção explícita). A régua é a do CHECK da coluna (`external_code = lower(btrim(...))`, 1 a 64
+ * caracteres): este regex é mais estreito de propósito — letras, números e hífen — e nunca mais largo.
+ */
+export const CODIGO_DO_SETOR = /^[a-z0-9][a-z0-9-]{0,62}$/;
+
+export const codigoExternoDoSetorSchema = z
+  .string()
+  .trim()
+  .toLowerCase()
+  .refine((v) => v === "" || CODIGO_DO_SETOR.test(v), {
+    message: "O código do setor usa só letras minúsculas, números e hífen, como suporte-tecnico.",
+  })
+  .transform((v) => (v === "" ? null : v))
+  .nullable();
+
 export const sectorCreateSchema = z
   .object({
     name: z.string().trim().min(1, "Dê um nome ao setor.").max(SETOR_NOME_MAX),
@@ -334,6 +352,8 @@ export const sectorCreateSchema = z
      * um formato por pergunta, não dois. Omitir = `{}` no banco = 24/7.
      */
     schedule: availabilityScheduleSchema.optional(),
+    /** Código com que o bot indica esta fila (migration 9109). Omitir = sem código. */
+    external_code: codigoExternoDoSetorSchema.optional(),
   })
   .strict();
 export type SectorCreate = z.infer<typeof sectorCreateSchema>;
@@ -354,11 +374,13 @@ export const sectorPatchSchema = z
      * fatia — apagar a cor é intenção explícita, não campo ausente.
      */
     color: corDaFilaSchema,
+    /** Código com que o bot indica esta fila (migration 9109). `null` = apagar o código. */
+    external_code: codigoExternoDoSetorSchema,
   })
   .partial()
   .strict()
   .refine((v) => Object.keys(v).length > 0, {
-    message: "Informe ao menos um campo (name, description, schedule ou color).",
+    message: "Informe ao menos um campo (name, description, schedule, color ou external_code).",
   });
 export type SectorPatch = z.infer<typeof sectorPatchSchema>;
 

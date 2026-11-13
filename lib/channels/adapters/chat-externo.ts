@@ -20,6 +20,8 @@
  * Não vem do contato: é a identidade opaca do chat (`web:<uuid>`), gravada em
  * `conversations.provider_conversation_id` e devolvida no envelope.
  */
+import { assertDestinoResolvidoSeguro } from "@/lib/automation/outbound-ip";
+import { assertSafeOutboundUrl } from "@/lib/automation/outbound-url";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { decryptWebhookSecret } from "@/lib/webhooks/secrets";
 import { HEADER_ASSINATURA_DE_ENTRADA } from "@/lib/webhooks/assinatura";
@@ -36,13 +38,15 @@ const PRAZO_DO_ENVIO_MS = 10_000;
 type Credenciais = { url: string; segredo: string };
 
 /**
- * A URL de saída precisa ser http(s) de verdade. A validação que impede endereço interno (SSRF) é da TELA que
- * grava o canal, onde o operador digita o endereço; aqui só se recusa o que nem é URL de web.
+ * A URL de saída passa na MESMA validação anti-SSRF das demais saídas do produto, de novo no envio: o endereço
+ * foi validado quando o operador o gravou, mas o banco pode ter sido editado por fora e o DNS pode ter mudado.
+ * Este passo é o textual; a resolução do nome (que pega o host público apontando para a rede interna) é feita em
+ * `send`, logo antes do fetch.
  */
 function urlDeEnvioValida(url: string): boolean {
   try {
-    const u = new URL(url);
-    return u.protocol === "https:" || u.protocol === "http:";
+    assertSafeOutboundUrl(url);
+    return true;
   } catch {
     return false;
   }
@@ -93,6 +97,14 @@ export const chatExternoAdapter: ChannelAdapter = {
 
     const credenciais = await credenciaisDoCanal(envelope.organizationId, envelope.sessionRef);
     if (!credenciais) throw new Error("chat_externo_not_configured");
+
+    // Guard textual não resolve nome: um host público que aponte para a rede interna (ou para o metadata da
+    // nuvem) passaria por ele. Este segundo resolve o nome e julga o IP.
+    try {
+      await assertDestinoResolvidoSeguro(new URL(credenciais.url).hostname);
+    } catch {
+      throw new Error("chat_externo_destination_blocked");
+    }
 
     await envelope.beforeSend?.();
 

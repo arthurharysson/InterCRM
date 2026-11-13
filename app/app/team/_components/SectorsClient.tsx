@@ -75,11 +75,12 @@ function SectorForm({
   isPending,
   submitLabel,
 }: {
-  initial?: { name: string; description: string | null; color: string | null };
+  initial?: { name: string; description: string | null; color: string | null; external_code: string | null };
   onSubmit: (v: {
     name: string;
     description: string | null;
     color?: string | null;
+    external_code?: string | null;
   }) => Promise<unknown>;
   isPending: boolean;
   submitLabel: string;
@@ -88,6 +89,8 @@ function SectorForm({
   const [name, setName] = useState(initial?.name ?? "");
   const [description, setDescription] = useState(initial?.description ?? "");
   const [color, setColor] = useState<string | null>(initial?.color ?? null);
+  // O código com que o bot do WhatsApp indica esta fila. Minúsculo e sem espaço: o que se digita já vira assim.
+  const [codigo, setCodigo] = useState(initial?.external_code ?? "");
   const nomeValido = name.trim().length > 0;
 
   return (
@@ -104,10 +107,20 @@ function SectorForm({
             // estrito) e quem pinta um setor novo é o editar, com a paleta à
             // vista ao lado do chip que acabou de nascer.
             ...(initial ? { color } : {}),
+            // Vazio = sem código. Na edição só vai quando MUDOU (apagar o que havia é mudar para `null`); na criação, só se
+            // preenchido. Mandar o que não mudou faria toda edição de cor ou nome reescrever o código à toa.
+            ...(initial
+              ? codigo.trim().toLowerCase() !== (initial.external_code ?? "")
+                ? { external_code: codigo.trim().toLowerCase() || null }
+                : {}
+              : codigo.trim()
+                ? { external_code: codigo.trim().toLowerCase() }
+                : {}),
           });
           if (!initial) {
             setName("");
             setDescription("");
+            setCodigo("");
           }
         } catch {
           // O erro já virou toast no hook; o formulário fica como está para a
@@ -136,6 +149,26 @@ function SectorForm({
           rows={2}
           onChange={(e) => setDescription(e.target.value)}
         />
+      </div>
+      <div className="space-y-1.5">
+        <Label htmlFor={initial ? "setor-codigo-edicao" : "setor-codigo"}>
+          {t("Código para o bot (opcional)")}
+        </Label>
+        <Input
+          id={initial ? "setor-codigo-edicao" : "setor-codigo"}
+          value={codigo}
+          maxLength={64}
+          placeholder="suporte-tecnico"
+          autoCapitalize="none"
+          autoComplete="off"
+          spellCheck={false}
+          onChange={(e) => setCodigo(e.target.value.toLowerCase().replace(/\s+/g, "-"))}
+        />
+        <p className="text-xs text-muted-foreground">
+          {t(
+            "É o nome curto com que o bot do WhatsApp indica esta fila ao mandar o cliente para o chat. Só letras minúsculas, números e hífen.",
+          )}
+        </p>
       </div>
       {initial ? (
         <div className="space-y-1.5">
@@ -310,6 +343,11 @@ export function SectorsClient({
                       {s.description ? (
                         <p className="text-xs text-muted-foreground wrap-anywhere">{s.description}</p>
                       ) : null}
+                      {s.external_code ? (
+                        <p className="text-xs text-muted-foreground">
+                          {t("Código para o bot")}: <code>{s.external_code}</code>
+                        </p>
+                      ) : null}
                       {/*
                         O horário do setor, na linha do setor. Sem esta linha, a única
                         forma de saber que uma fila atende só até as 18h seria abrir
@@ -426,7 +464,12 @@ export function SectorsClient({
               <DialogTitle>{t("Editar setor")}</DialogTitle>
             </DialogHeader>
             <SectorForm
-              initial={{ name: editing.name, description: editing.description, color: editing.color }}
+              initial={{
+                name: editing.name,
+                description: editing.description,
+                color: editing.color,
+                external_code: editing.external_code ?? null,
+              }}
               isPending={update.isPending}
               submitLabel={t("Salvar")}
               onSubmit={async (v) => {

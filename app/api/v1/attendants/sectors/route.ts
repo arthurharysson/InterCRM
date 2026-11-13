@@ -29,7 +29,7 @@ import { traduzir } from "@/lib/i18n/dicionario";
 
 export const dynamic = "force-dynamic";
 
-const SELECT_COLS = "id, name, description, schedule, color, created_at, updated_at";
+const SELECT_COLS = "id, name, description, schedule, color, external_code, created_at, updated_at";
 
 export async function GET(_req: NextRequest): Promise<Response> {
   const requestId = randomUUID();
@@ -117,12 +117,17 @@ export async function POST(req: NextRequest): Promise<Response> {
       description: input.description,
       // Omitir horário na criação = `{}` no banco = 24/7 (default da coluna).
       ...(input.schedule ? { schedule: input.schedule } : {}),
+      ...(input.external_code ? { external_code: input.external_code } : {}),
     })
     .select(SELECT_COLS)
     .single();
 
   if (error) {
     if (error.code === "23505") {
+      // Dois índices únicos por organização: o do nome e o do código externo. A mensagem do banco diz qual.
+      if (error.message.includes("external_code")) {
+        return fail("sector_code_taken", t("Já existe um setor com este código."), 409, { requestId });
+      }
       return fail("sector_name_taken", t("Já existe um setor com este nome."), 409, { requestId });
     }
     return fail("internal_error", error.message, 500, { requestId });

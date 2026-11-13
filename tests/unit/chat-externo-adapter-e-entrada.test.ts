@@ -18,6 +18,11 @@ vi.mock("@/lib/supabase/admin", () => {
 });
 vi.mock("@/lib/webhooks/secrets", () => ({ decryptWebhookSecret: (...a: unknown[]) => decrypt(...a) }));
 
+const destinoResolvido = vi.fn();
+vi.mock("@/lib/automation/outbound-ip", () => ({
+  assertDestinoResolvidoSeguro: (...a: unknown[]) => destinoResolvido(...a),
+}));
+
 const ingerir = vi.fn();
 vi.mock("@/lib/channels/chat-externo/ingest", () => ({ ingerirEventoDoChat: (...a: unknown[]) => ingerir(...a) }));
 
@@ -58,6 +63,7 @@ beforeEach(() => {
     chat_externo_secret_out_encrypted: "cifrado",
   });
   decrypt.mockReset().mockResolvedValue(SEGREDO_DE_SAIDA);
+  destinoResolvido.mockReset().mockResolvedValue(undefined);
   fetchSpy = vi.fn().mockResolvedValue(new Response("{}", { status: 200 }));
   vi.stubGlobal("fetch", fetchSpy);
 });
@@ -100,6 +106,13 @@ describe("adapter de saída", () => {
   ])("canal incompleto (%s): FALHA com o código do canal e não envia (nada some em silêncio)", async (_n, preparar) => {
     preparar();
     await expect(chatExternoAdapter.send(envelope())).rejects.toThrow("chat_externo_not_configured");
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it("endereço que resolve para a rede interna é BLOQUEADO antes do fetch (SSRF por DNS)", async () => {
+    destinoResolvido.mockRejectedValue(new Error("unsafe_url:resolved_private_ip"));
+    await expect(chatExternoAdapter.send(envelope())).rejects.toThrow("chat_externo_destination_blocked");
+    expect(destinoResolvido).toHaveBeenCalledWith("chat.exemplo.com.br");
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
