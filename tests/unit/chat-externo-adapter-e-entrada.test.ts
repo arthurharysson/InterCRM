@@ -136,6 +136,47 @@ describe("adapter de saída", () => {
   });
 });
 
+describe("aviso de encerramento (CRM → Chat)", () => {
+  const entrada = {
+    organizationId: "org-1",
+    sessionRef: "principal",
+    providerConversationId: "web:0b6f3f9e-1c7a-4c1e-9a55-2d5a1e7c9f10",
+    conversationId: "conv-1",
+    closedAt: "2026-11-13T15:00:00.000Z",
+  };
+
+  it("envia conversation.closed assinado com o segredo DO CANAL e a versão do contrato", async () => {
+    await chatExternoAdapter.notificarEncerramento!(entrada);
+
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchSpy.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe(URL_DO_CHAT);
+    const headers = init.headers as Record<string, string>;
+    expect(headers[CABECALHO_DO_CONTRATO]).toBe(VERSAO_DO_CONTRATO);
+    expect(headers[HEADER_ASSINATURA_DE_ENTRADA]).toBe(assinarCorpo(init.body as string, SEGREDO_DE_SAIDA));
+    expect(JSON.parse(init.body as string)).toEqual({
+      event: "conversation.closed",
+      identity: entrada.providerConversationId,
+      conversation_id: "conv-1",
+      closed_at: "2026-11-13T15:00:00.000Z",
+      reason: "resolved",
+    });
+  });
+
+  it("canal incompleto, destino bloqueado e resposta não-2xx LANÇAM (quem chama registra)", async () => {
+    linhaDoCanal.mockReturnValue(null);
+    await expect(chatExternoAdapter.notificarEncerramento!(entrada)).rejects.toThrow("chat_externo_not_configured");
+
+    linhaDoCanal.mockReturnValue({ chat_externo_url: URL_DO_CHAT, chat_externo_secret_out_encrypted: "x" });
+    destinoResolvido.mockRejectedValue(new Error("privado"));
+    await expect(chatExternoAdapter.notificarEncerramento!(entrada)).rejects.toThrow("chat_externo_destination_blocked");
+
+    destinoResolvido.mockResolvedValue(undefined);
+    fetchSpy.mockResolvedValue(new Response("{}", { status: 502 }));
+    await expect(chatExternoAdapter.notificarEncerramento!(entrada)).rejects.toThrow("chat_externo_close_notice_failed_502");
+  });
+});
+
 describe("entrada do webhook", () => {
   const corpo = JSON.stringify({ identity: "web:abc", text: "oi" });
   const cabecalhos = (assinatura: string | null) => {

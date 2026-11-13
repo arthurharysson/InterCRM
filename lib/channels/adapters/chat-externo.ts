@@ -85,6 +85,40 @@ export const chatExternoAdapter: ChannelAdapter = {
     return { reachable: true, status: "FAILED", detail: "chat_externo_not_configured" };
   },
 
+  /**
+   * Avisa o Chat que o atendimento foi encerrado (`conversation.closed`), para ele bloquear o campo de texto e
+   * mostrar "Atendimento encerrado". Mesmo endereço, mesma assinatura e mesmo cabeçalho de contrato que a resposta
+   * do atendente. LANÇA quando não saiu: quem chama registra e segue (fechar a conversa não pode depender do Chat).
+   */
+  async notificarEncerramento(input) {
+    const credenciais = await credenciaisDoCanal(input.organizationId, input.sessionRef);
+    if (!credenciais) throw new Error("chat_externo_not_configured");
+    try {
+      await assertDestinoResolvidoSeguro(new URL(credenciais.url).hostname);
+    } catch {
+      throw new Error("chat_externo_destination_blocked");
+    }
+
+    const corpo = JSON.stringify({
+      event: "conversation.closed",
+      identity: input.providerConversationId,
+      conversation_id: input.conversationId,
+      closed_at: input.closedAt,
+      reason: "resolved",
+    });
+    const resposta = await fetch(credenciais.url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        [HEADER_ASSINATURA_DE_ENTRADA]: assinarCorpo(corpo, credenciais.segredo),
+        [CABECALHO_DO_CONTRATO]: VERSAO_DO_CONTRATO,
+      },
+      body: corpo,
+      signal: AbortSignal.timeout(PRAZO_DO_ENVIO_MS),
+    });
+    if (!resposta.ok) throw new Error(`chat_externo_close_notice_failed_${resposta.status}`);
+  },
+
   codes: {
     notConfigured: "chat_externo_not_configured",
     sendFailed: "chat_externo_send_failed",

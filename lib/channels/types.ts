@@ -494,6 +494,24 @@ export interface ChannelAdapter {
   checkHealth?(input: ChannelTenantScope & { sessionRef: string }): Promise<ChannelHealth>;
 
   /**
+   * O atendimento desta conversa foi ENCERRADO no CRM — avisa o transporte, para o lado de lá parar de oferecer
+   * o campo de texto. Só faz sentido para canal cujo outro lado é uma tela que o CRM não enxerga (um chat web);
+   * quem conversa por aparelho, plataforma ou rede social não implementa, e quem chama testa a presença.
+   *
+   * LANÇA quando o aviso não saiu: quem chama decide o que fazer (hoje, registrar). Nunca deve derrubar o
+   * fechamento da conversa — fechar é o gesto pedido.
+   */
+  notificarEncerramento?(
+    input: ChannelTenantScope & {
+      sessionRef: string;
+      /** A identidade da conversa no transporte (`conversations.provider_conversation_id`). */
+      providerConversationId: string;
+      conversationId: string;
+      closedAt: string;
+    },
+  ): Promise<void>;
+
+  /**
    * Uma PÁGINA da agenda de contatos do APARELHO pareado — o que o número da
    * empresa salvou no celular (`limit`/`offset`, com ordenação fixa lá dentro
    * para o offset não pular nem repetir linha).
