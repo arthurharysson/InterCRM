@@ -198,6 +198,21 @@ describe("chat.started", () => {
     // o histórico é contexto, não atividade: nenhum alerta, agente ou automação
     expect(aplicarEfeitosPosEntrada).not.toHaveBeenCalled();
     expect(rpcs.some((x) => x.nome === "fn_mark_conversation_message")).toBe(false);
+
+    // mas a lista da Fila não pode mostrar "Sem mensagens": a prévia e a data vêm da última do histórico
+    expect(t.conversations[0]!).toMatchObject({
+      last_message_preview: "Qual o seu CPF?",
+      last_message_at: "2026-11-13T13:58:03.000Z",
+    });
+    // e NADA que seja relógio de espera ou não-lida é tocado (só a RPC de atividade faz isso)
+    expect(t.conversations[0]!).not.toHaveProperty("unread_count_for_assignee");
+    expect(t.conversations[0]!).not.toHaveProperty("awaiting_since");
+  });
+
+  it("chat.started sem histórico não inventa prévia", async () => {
+    const { admin, t } = bancoEmMemoria({});
+    await ingerirEventoDoChat(admin, { ...entrada, evento: evento({ ...INICIO, sector: undefined, history: [] }) });
+    expect(t.conversations[0]!).not.toHaveProperty("last_message_preview");
   });
 
   it("reenviar o MESMO chat.started não duplica contato, conversa nem histórico", async () => {

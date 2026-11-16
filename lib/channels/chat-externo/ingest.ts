@@ -251,7 +251,34 @@ async function importarHistorico(
   for (const m of ev.history) {
     if (await gravarDoHistorico(admin, entrada, conversationId, contactId, ev.identity, m)) gravadas++;
   }
+  if (gravadas > 0) await preencherPrevia(admin, entrada, conversationId, ev);
   return gravadas;
+}
+
+/**
+ * A lista da Fila lê `last_message_preview`; sem ela a conversa recém-aberta aparece como "Sem mensagens" mesmo
+ * com o histórico do bot já dentro (visto na prova pela tela). Só a PRÉVIA e a data entram — e só se a conversa
+ * ainda não tem nenhuma —, porque `fn_mark_conversation_message` também zeraria o relógio de espera e somaria
+ * não-lidas, e o histórico não é atividade do cliente. Falhar aqui não derruba a entrada: é cosmético.
+ */
+async function preencherPrevia(
+  admin: SupabaseClient,
+  entrada: Entrada,
+  conversationId: string,
+  ev: Extract<EventoDoChat, { event: "chat.started" }>,
+): Promise<void> {
+  const ultima = ev.history[ev.history.length - 1];
+  if (!ultima) return;
+  const { error } = await admin
+    .from("conversations")
+    .update({
+      last_message_preview: ultima.text.slice(0, 200),
+      last_message_at: ultima.sent_at ?? ev.started_at ?? new Date().toISOString(),
+    })
+    .eq("id", conversationId)
+    .eq("organization_id", entrada.organizationId)
+    .is("last_message_at", null);
+  if (error) logger.warn("[chat-externo] prévia do histórico não gravada", { message: error.message });
 }
 
 async function gravarDoHistorico(

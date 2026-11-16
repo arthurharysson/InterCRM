@@ -174,7 +174,7 @@ function CartaoDoCanal({ canal, aoGirar }: { canal: Canal; aoGirar: (s: Segredos
             id={`chat-endereco-${canal.channel_session_id}`}
             value={endereco}
             onChange={(e) => setEndereco(e.target.value)}
-            placeholder="https://chat.suaempresa.com.br/api/crm/events"
+            placeholder="https://<endereço-do-seu-chat>/api/crm/events"
             autoComplete="off"
           />
           <Button
@@ -257,7 +257,7 @@ export function CanalChatPublicoClient() {
                 id="chat-endereco"
                 value={endereco}
                 onChange={(e) => setEndereco(e.target.value)}
-                placeholder="https://chat.suaempresa.com.br/api/crm/events"
+                placeholder="https://<endereço-do-seu-chat>/api/crm/events"
                 autoComplete="off"
               />
               <p className="text-xs text-muted-foreground">

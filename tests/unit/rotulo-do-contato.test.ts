@@ -157,6 +157,11 @@ describe("a sétima cópia não nasce", () => {
    * último caso), para não sobrar autorização em nome de código que sumiu.
    */
   const LEITURAS_LEGITIMAS: ReadonlyArray<{ arquivo: string; trecho: string; motivo: string }> = [
+    {
+      arquivo: "components/connections/CanalChatPublicoClient.tsx",
+      trecho: "{canal.display_name ?? canal.ref}",
+      motivo: "título do CANAL de chat (channel_sessions) em Conexões, não nome de contato",
+    },
     // ── prospecção (PR #963): nenhuma destas é nome de CONTATO ──────────────
     {
       arquivo: "app/app/prospecting/_client.tsx",
