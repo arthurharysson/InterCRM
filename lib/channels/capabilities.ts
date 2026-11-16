@@ -140,6 +140,20 @@ export const CHANNEL_CAPABILITIES: Record<ProviderDeMensagem, ChannelCapabilitie
     // O transporte é o InterSuite: não há aparelho pareado, então não há agenda de celular a ler.
     phonebook: false,
   },
+  // O Chat externo (aplicação própria, fora do WhatsApp): o cliente conversa numa página web e o
+  // atendente responde pelo CRM. Sem plataforma por trás e sem custo por mensagem — é o motivo de ele existir.
+  chat_externo: {
+    freeformOutsideWindow: true,
+    requiresTemplates: false,
+    canManageTemplates: false,
+    banRisk: false,
+    minIntervalMs: null,
+    voiceNote: "server-convert",
+    groups: "none",
+    costPerMessage: false,
+    alteraMensagemEnviada: false,
+    phonebook: false,
+  },
 };
 
 /**
@@ -168,6 +182,11 @@ export const CHANNEL_PROVIDER_DATAFY: ChannelProvider = "datafy";
 export const CHANNEL_PROVIDER_WACALLS: ChannelProvider = "wacalls";
 /** Chat web — o transporte é o próprio InterSuite, não há provider externo. */
 export const CHANNEL_PROVIDER_WEB: ChannelProvider = "web";
+/**
+ * Chat externo — a página de chat própria (aplicação separada) para onde o bot do WhatsApp manda o
+ * cliente. É OUTRO provider, de propósito: o canal `web` acima é do InterSuite e não é tocado.
+ */
+export const CHANNEL_PROVIDER_CHAT_EXTERNO: ChannelProvider = "chat_externo";
 
 /**
  * O provider em que o NÚMERO é a conexão: pareado por QR, a linha só vira
@@ -200,6 +219,7 @@ export const PROVIDERS_DE_MENSAGEM = [
   "zernio_social",
   "datafy",
   "web",
+  "chat_externo",
 ] as const satisfies readonly ProviderDeMensagem[];
 
 /**

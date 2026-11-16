@@ -27,7 +27,7 @@ import { traduzir } from "@/lib/i18n/dicionario";
 
 export const dynamic = "force-dynamic";
 
-const SELECT_COLS = "id, name, description, color, created_at, updated_at";
+const SELECT_COLS = "id, name, description, color, external_code, created_at, updated_at";
 const idSchema = z.string().uuid();
 
 export async function PATCH(
@@ -91,6 +91,10 @@ export async function PATCH(
 
   if (error) {
     if (error.code === "23505") {
+      // Dois índices únicos por organização: o do nome e o do código externo. A mensagem do banco diz qual.
+      if (error.message.includes("external_code")) {
+        return fail("sector_code_taken", t("Já existe um setor com este código."), 409, { requestId });
+      }
       return fail("sector_name_taken", t("Já existe um setor com este nome."), 409, { requestId });
     }
     return fail("internal_error", error.message, 500, { requestId });

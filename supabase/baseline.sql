@@ -9604,6 +9604,13 @@ alter table public.channel_sessions
   add column if not exists datafy_waba_id text,
   add column if not exists datafy_token_encrypted bytea;
 
+-- archived_at ANTES dos índices únicos parciais abaixo (web e chat externo), que o usam no WHERE. A coluna nasce de
+-- novo mais adiante (migration 0106) com `add column if not exists`, então repetir aqui é inofensivo. Sem esta linha
+-- uma instalação DO ZERO (ON_ERROR_STOP) para no índice do canal web com `column "archived_at" does not exist`: o
+-- defeito já estava na main, e não aparecia em quem atualiza um banco que já tem a coluna.
+alter table public.channel_sessions
+  add column if not exists archived_at timestamptz;
+
 -- canal web — InterSuite (migration 8804): coluna discriminadora do provider 'web', nullable e
 -- antes das constraints que a referenciam. O índice único é parcial: canal arquivado só
 -- sobrevive como âncora das FKs RESTRICT, e uma trava total impediria recriar o mesmo widget.
@@ -9614,14 +9621,26 @@ create unique index if not exists channel_sessions_web_widget_id_ativo_unique
   on public.channel_sessions (organization_id, web_widget_id)
   where web_widget_id is not null and archived_at is null;
 
+-- chat externo (migration 9109): a página de chat própria. Colunas do provider 'chat_externo', nullable e antes das
+-- constraints que as referenciam. A entrada (Chat -> CRM) usa as colunas de webhook que já existem; a saída
+-- (CRM -> Chat) guarda o endereço e o segredo cifrado por canal. O canal 'web' acima NÃO é tocado.
+alter table public.channel_sessions
+  add column if not exists chat_externo_ref text,
+  add column if not exists chat_externo_url text,
+  add column if not exists chat_externo_secret_out_encrypted text;
+
+create unique index if not exists channel_sessions_chat_externo_ref_ativo_unique
+  on public.channel_sessions (organization_id, chat_externo_ref)
+  where chat_externo_ref is not null and archived_at is null;
+
 alter table public.channel_sessions
   drop constraint if exists channel_sessions_provider_check;
 
 alter table public.channel_sessions
   add constraint channel_sessions_provider_check
-  -- 'wacalls' (0233), 'zernio_social' (0368), 'datafy' (0387) e 'web' (8804) somados AQUI —
+  -- 'wacalls' (0233), 'zernio_social' (0368), 'datafy' (0387), 'web' (8804) e 'chat_externo' (9109) somados AQUI —
   -- UM bloco só por constraint (não duplicar drop+add por migration).
-  check (provider = any (array['waha'::text, 'meta_cloud'::text, 'zernio'::text, 'wacalls'::text, 'zernio_social'::text, 'datafy'::text, 'web'::text]));
+  check (provider = any (array['waha'::text, 'meta_cloud'::text, 'zernio'::text, 'wacalls'::text, 'zernio_social'::text, 'datafy'::text, 'web'::text, 'chat_externo'::text]));
 
 alter table public.channel_sessions
   drop constraint if exists channel_sessions_provider_ref_check;
@@ -9636,7 +9655,9 @@ alter table public.channel_sessions
     (provider = 'wacalls'    and wacalls_session_id    is not null) or
     (provider = 'datafy'     and datafy_phone_number_id is not null) or
     -- 'web' (migration 8804): o chat do InterSuite; a referência é o id do widget.
-    (provider = 'web'        and web_widget_id          is not null)
+    (provider = 'web'        and web_widget_id          is not null) or
+    -- 'chat_externo' (migration 9109): a página de chat própria; a referência é o id do canal na organização.
+    (provider = 'chat_externo' and chat_externo_ref     is not null)
   );
 
 comment on column public.channel_sessions.zernio_account_id is
@@ -73677,5 +73698,39 @@ comment on column public.llm_calls.prefixo_hash is
 create index if not exists idx_messages_derivacao_adiada
   on public.messages (organization_id, conversation_id, created_at desc)
   where (metadata ? 'derivacao_adiada') and media_storage_path is not null;
+
+notify pgrst, 'reload schema';
+
+-- ---- Chat externo: código externo do setor (migration 9109) ----
+-- O bot do WhatsApp indica o setor por um CÓDIGO curto (ex.: suporte-tecnico); o CRM acha o setor por ele.
+-- Nullable, sem constraint sobre dado existente: nenhuma linha a corrigir antes.
+alter table public.attendant_sectors
+  add column if not exists external_code text;
+
+do $$
+begin
+  if not exists (
+    select 1 from pg_constraint
+    where conname = 'attendant_sectors_external_code_forma'
+      and conrelid = 'public.attendant_sectors'::regclass
+  ) then
+    alter table public.attendant_sectors
+      add constraint attendant_sectors_external_code_forma
+      check (external_code is null or (external_code = lower(btrim(external_code)) and char_length(external_code) between 1 and 64));
+  end if;
+end $$;
+
+create unique index if not exists attendant_sectors_org_external_code_unique
+  on public.attendant_sectors (organization_id, external_code)
+  where external_code is not null;
+
+comment on column public.channel_sessions.chat_externo_ref is
+  'Identificador do canal Chat externo DENTRO da organização (provider chat_externo). Espelhado em lib/channels/session-ref.ts.';
+comment on column public.channel_sessions.chat_externo_url is
+  'Endereço de entrada do Chat para onde o CRM envia as respostas do atendente (POST assinado). Só o canal chat_externo.';
+comment on column public.channel_sessions.chat_externo_secret_out_encrypted is
+  'Segredo (cifrado) com que o CRM assina o que envia ao Chat. Só o canal chat_externo. O de entrada é webhook_secret_encrypted.';
+comment on column public.attendant_sectors.external_code is
+  'Código curto e estável com que um sistema externo (o bot do WhatsApp) indica o setor, ex.: suporte-tecnico. Minúsculo, único por organização.';
 
 notify pgrst, 'reload schema';

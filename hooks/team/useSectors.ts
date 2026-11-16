@@ -25,6 +25,11 @@ export interface Sector {
   /** Quantos atendentes estão nesta fila agora. */
   member_count: number;
   /**
+   * Código com que o bot do WhatsApp indica esta fila (migration 9109), ex.: `suporte-tecnico`, ou `null` = sem código.
+   * Minúsculo e único por organização.
+   */
+  external_code: string | null;
+  /**
    * Cor de identificação da fila (`#rrggbb`, migration 9084) ou `null` = sem
    * cor, que é o visual de antes da fatia. A frente do chip sai de
    * `escolheAFrente` — nunca de escolha de quem pinta.
@@ -73,6 +78,7 @@ export function useCreateSector() {
       name: string;
       description: string | null;
       schedule?: AvailabilitySchedule;
+      external_code?: string | null;
     }) =>
       apiClient.post<{ data: Sector }>("/api/v1/attendants/sectors", input),
     onError: (err) => showApiError(err),
@@ -98,6 +104,8 @@ export function useUpdateSector() {
         schedule?: AvailabilitySchedule;
         /** `#rrggbb` ou `null` (apagar a cor). Validado no Zod e no CHECK. */
         color?: string | null;
+        /** Código com que o bot indica a fila; `null` apaga. */
+        external_code?: string | null;
       };
     }) =>
       apiClient.patch<{ data: Sector }>(`/api/v1/attendants/sectors/${id}`, patch),

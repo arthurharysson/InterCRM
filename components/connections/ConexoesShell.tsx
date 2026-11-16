@@ -4,6 +4,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 import { RedesSociaisClient } from "./RedesSociaisClient";
+import { CanalChatPublicoClient } from "./CanalChatPublicoClient";
 import { CanalGraphParceiroClient } from "./CanalGraphParceiroClient";
 import { CanalOficialClient } from "./CanalOficialClient";
 import { CanalParceiroClient } from "./CanalParceiroClient";
@@ -68,6 +69,8 @@ export function ConexoesShell({
           ? "telefonia"
           : abaParam === "voz"
             ? "voz"
+            : abaParam === "chat"
+              ? "chat"
             : abaParam === "graph" && graphParceiro
               ? "graph"
               : "numeros";
@@ -106,6 +109,7 @@ export function ConexoesShell({
         <TabsTrigger value="telefonia">{t("Telefone")}</TabsTrigger>
         <TabsTrigger value="sociais">{t("Redes sociais")}</TabsTrigger>
         <TabsTrigger value="voz">{t("Chamada de voz")}</TabsTrigger>
+        <TabsTrigger value="chat">{t("Chat fora do WhatsApp")}</TabsTrigger>
         {graphParceiro && <TabsTrigger value="graph">{graphParceiro.label}</TabsTrigger>}
       </TabsList>
 
@@ -120,6 +124,10 @@ export function ConexoesShell({
 
       <TabsContent value="voz" className="mt-0">
         <CanalVozClient wacallsConfigured={wacallsConfigured} />
+      </TabsContent>
+
+      <TabsContent value="chat" className="mt-0">
+        <CanalChatPublicoClient />
       </TabsContent>
 
       {graphParceiro && (

@@ -16,7 +16,8 @@ export type ChannelSessionRef =
   | { provider: "meta_cloud"; meta_phone_number_id: string }
   | { provider: "zernio" | "zernio_social"; zernio_account_id: string }
   | { provider: "datafy"; datafy_phone_number_id: string }
-  | { provider: "web"; web_widget_id: string };
+  | { provider: "web"; web_widget_id: string }
+  | { provider: "chat_externo"; chat_externo_ref: string };
 
 /**
  * Colunas que um `select` do PostgREST precisa trazer para `resolveSessionRef`
@@ -24,7 +25,7 @@ export type ChannelSessionRef =
  * nomeia coluna de provider, e ela some da feature junto com a decisão.
  */
 export const CHANNEL_SESSION_REF_COLUMNS =
-  "provider, waha_session_name, meta_phone_number_id, zernio_account_id, datafy_phone_number_id, web_widget_id";
+  "provider, waha_session_name, meta_phone_number_id, zernio_account_id, datafy_phone_number_id, web_widget_id, chat_externo_ref";
 
 export function resolveSessionRef(session: ChannelSessionRef): string {
   switch (session.provider) {
@@ -44,5 +45,7 @@ export function resolveSessionRef(session: ChannelSessionRef): string {
       return session.zernio_account_id;
     case "web":
       return session.web_widget_id;
+    case "chat_externo":
+      return session.chat_externo_ref;
   }
 }

@@ -1509,6 +1509,12 @@ jobs:
       # (`platform_settings.molde_de_ia_org_id`, migration 9096) e a devolve a
       # nulo no fim: deixada escolhida, as empresas das specs seguintes desta
       # parte nasceriam com a IA do molde.
+      #
+      # `canal-chat-externo` entrou com o canal novo (Conexões › Chat fora do
+      # WhatsApp): cria setor e canal pela tela, posta eventos assinados na rota
+      # de entrada do canal e confere a Fila. Não usa WAHA, Redis nem Resend; o
+      # canal e o setor que cria ela mesma arquiva/apaga no fim. PREVISÃO, não
+      # medida no CI: ~2,5 min local.
       SPECS_PARTE_7: >-
         celular-toque-nos-controles.spec.ts
         agente-novo-e-uso.spec.ts
@@ -1524,6 +1530,7 @@ jobs:
         propostas-de-campos-do-card.spec.ts
         aviso-pelo-numero-oficial.spec.ts
         molde-de-ia-empresas-novas.spec.ts
+        canal-chat-externo.spec.ts
       # Ambiente isolado: esta spec exige HMAC WAHA e Graph sintético no
       # processo next start. As demais partes preservam a configuração WAHA.
       #

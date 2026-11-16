@@ -48,6 +48,7 @@ import { type NextRequest } from "next/server";
 import { audit } from "@/lib/audit";
 import { ok, fail } from "@/lib/api/wrappers";
 import { requireRole } from "@/lib/auth/require-role";
+import { avisarEncerramentoAoCanal } from "@/lib/channels/encerramento";
 import { roleAtLeast } from "@/lib/auth/types";
 import { devolverAtendimentoAoAgente, type RetomadaResultado } from "@/lib/escalacao/retomada";
 import { logger } from "@/lib/logger";
@@ -173,6 +174,13 @@ export async function POST(req: NextRequest, ctx: RouteCtx): Promise<Response> {
     resourceType: "conversation",
     resourceId: convFechada.id,
     requestId,
+  });
+
+  // Avisa o canal, se ele quiser saber (um chat web precisa bloquear o campo de texto do cliente). Nunca derruba o
+  // fechamento: a função engole e registra qualquer falha, e esta rota não sabe qual canal é.
+  await avisarEncerramentoAoCanal(createAdminClient(), {
+    organizationId: convFechada.organization_id,
+    conversationId: convFechada.id,
   });
 
   return ok(devolucao === null ? convFechada : { ...convFechada, devolucao }, { requestId });
