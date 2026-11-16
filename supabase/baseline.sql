@@ -9604,6 +9604,13 @@ alter table public.channel_sessions
   add column if not exists datafy_waba_id text,
   add column if not exists datafy_token_encrypted bytea;
 
+-- archived_at ANTES dos índices únicos parciais abaixo (web e chat externo), que o usam no WHERE. A coluna nasce de
+-- novo mais adiante (migration 0106) com `add column if not exists`, então repetir aqui é inofensivo. Sem esta linha
+-- uma instalação DO ZERO (ON_ERROR_STOP) para no índice do canal web com `column "archived_at" does not exist`: o
+-- defeito já estava na main, e não aparecia em quem atualiza um banco que já tem a coluna.
+alter table public.channel_sessions
+  add column if not exists archived_at timestamptz;
+
 -- canal web — InterSuite (migration 8804): coluna discriminadora do provider 'web', nullable e
 -- antes das constraints que a referenciam. O índice único é parcial: canal arquivado só
 -- sobrevive como âncora das FKs RESTRICT, e uma trava total impediria recriar o mesmo widget.
