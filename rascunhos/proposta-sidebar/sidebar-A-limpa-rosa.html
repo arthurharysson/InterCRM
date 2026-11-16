@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+
+<html lang="pt-BR"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0" name="viewport"/><meta content="web_dashboard" name="shell-type"/><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"/><link href="https://fonts.googleapis.com" rel="preconnect"/><link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=Plus+Jakarta+Sans:wght@500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/><style>@layer base{html,body{margin:0;padding:0;}body{overscroll-behavior:none;}main>:first-child{margin-top:0!important;}main>:last-child{margin-bottom:0!important;}}::-webkit-scrollbar{display:none;}.material-symbols-outlined{font-variation-settings:'FILL' 0,'wght' 300,'GRAD' 0,'opsz' 20;font-size:18px;line-height:1;}</style><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config={"darkMode":"class","theme":{"extend":{"colors":{"on-secondary":"#ffffff","on-primary-fixed":"#500724","error":"#ba1a1a","on-background":"#131b2d","tertiary":"#983500","surface-bright":"#faf8ff","surface":"#faf8ff","surface-container-highest":"#f1d0df","surface-dim":"#d2d9f3","surface-tint":"#be185d","on-tertiary-container":"#ffefe9","on-primary-container":"#f2f1ff","error-container":"#ffdad6","primary":"#be185d","on-secondary-container":"#596377","surface-variant":"#dbe2fb","inverse-primary":"#f9a8d4","background":"#faf8ff","on-surface-variant":"#444656","on-surface":"#131b2d","secondary-fixed":"#d9e3fb","on-error":"#ffffff","primary-container":"#ec4899","inverse-surface":"#283043","on-secondary-fixed-variant":"#3d475a","secondary-container":"#d6e0f8","surface-container-lowest":"#ffffff","primary-fixed":"#fce7f3","secondary":"#555f73","on-error-container":"#93000a","on-tertiary-fixed-variant":"#7f2b00","surface-container-high":"#f7dce8","outline":"#747688","tertiary-fixed":"#ffdbce","on-primary-fixed-variant":"#9d174d","tertiary-fixed-dim":"#ffb599","primary-fixed-dim":"#f9a8d4","on-tertiary-fixed":"#370e00","surface-container-low":"#fdf4f8","secondary-fixed-dim":"#bdc7de","on-secondary-fixed":"#111c2d","on-primary":"#ffffff","on-tertiary":"#ffffff","outline-variant":"#c4c5d9","tertiary-container":"#c14500","surface-container":"#fbe9f1","inverse-on-surface":"#edf0ff"},"borderRadius":{"DEFAULT":"1rem","lg":"2rem","xl":"3rem","full":"9999px"},"spacing":{"margin-lg":"2rem","gutter":"1.25rem","margin-sm":"1rem","gutter-sm":"0.75rem","space-xs":"0.375rem","space-2xs":"0.25rem","space-lg":"1rem","space-md":"0.75rem","gutter-lg":"1.5rem","margin":"1.5rem","space-3xl":"2rem","space-xl":"1.25rem","space-2xl":"1.5rem","space-sm":"0.5rem"},"fontFamily":{"body-sm":["Inter"],"body-lg":["Inter"],"headline-md":["Plus Jakarta Sans"],"body-xs":["Inter"],"body-md":["Inter"],"tabular-data-sm":["Inter"],"display-lg-mobile":["Plus Jakarta Sans"],"label-sm":["Inter"],"label-md":["Inter"],"tabular-data-lg":["Inter"],"display-lg":["Plus Jakarta Sans"],"headline-lg":["Plus Jakarta Sans"],"headline-xl":["Plus Jakarta Sans"],"tabular-data-md":["Inter"],"headline-sm":["Plus Jakarta Sans"]},"fontSize":{"body-sm":["13px",{"lineHeight":"18px","fontWeight":"400"}],"body-lg":["16px",{"lineHeight":"24px","fontWeight":"400"}],"headline-md":["18px",{"lineHeight":"26px","letterSpacing":"-0.01em","fontWeight":"600"}],"body-xs":["12px",{"lineHeight":"16px","fontWeight":"400"}],"body-md":["14px",{"lineHeight":"21px","fontWeight":"400"}],"tabular-data-sm":["12px",{"lineHeight":"16px","fontWeight":"500"}],"display-lg-mobile":["28px",{"lineHeight":"36px","letterSpacing":"-0.02em","fontWeight":"600"}],"label-sm":["11px",{"lineHeight":"14px","letterSpacing":"0.04em","fontWeight":"600"}],"label-md":["13px",{"lineHeight":"18px","fontWeight":"500"}],"tabular-data-lg":["20px",{"lineHeight":"26px","letterSpacing":"-0.01em","fontWeight":"600"}],"display-lg":["36px",{"lineHeight":"44px","letterSpacing":"-0.025em","fontWeight":"600"}],"headline-lg":["22px",{"lineHeight":"30px","letterSpacing":"-0.015em","fontWeight":"600"}],"headline-xl":["28px",{"lineHeight":"36px","letterSpacing":"-0.02em","fontWeight":"600"}],"tabular-data-md":["14px",{"lineHeight":"20px","fontWeight":"500"}],"headline-sm":["15px",{"lineHeight":"22px","letterSpacing":"-0.005em","fontWeight":"600"}]}}}};</script></head><body class="bg-[#F4F6FA] text-on-surface antialiased"><aside class="fixed top-4 bottom-4 left-4 w-[256px] bg-white rounded-[20px] border border-[#E6E9F0] shadow-[0_4px_20px_-2px_rgba(15,23,42,0.05),0_2px_6px_-1px_rgba(15,23,42,0.03)] z-50 flex flex-col">
+  <div class="flex items-center gap-3 px-4 pt-4 pb-3">
+    <div class="w-10 h-10 rounded-xl bg-primary-container text-on-primary flex items-center justify-center font-headline-sm text-[17px]">S</div>
+    <div class="leading-tight min-w-0 flex-1"><div class="font-headline-sm text-[15px] text-[#0F1729] truncate">Sua Marca</div><div class="text-[12px] text-[#667085] truncate">Matriz São Paulo</div></div>
+    <button type="button" title="Trocar de organização" class="w-8 h-8 rounded-lg text-[#98A2B3] hover:bg-slate-50 flex items-center justify-center"><span class="material-symbols-outlined !text-[18px]">unfold_more</span></button>
+  </div>
+  <div class="mx-4 h-px bg-[#F1F3F7]"></div>
+  <nav class="flex-1 overflow-y-auto px-3 pb-2" aria-label="Navegação principal"><div><button type="button" class="w-full flex items-center justify-between px-3 pt-4 pb-1.5 text-[11px] font-semibold tracking-[0.06em] uppercase text-[#98A2B3] hover:text-[#667085]"><span>Atendimento</span><span class="material-symbols-outlined !text-[16px]">expand_more</span></button><div class="flex flex-col gap-0.5"><a href="#" class="relative flex items-center gap-3 h-9 px-3 rounded-xl text-[14px] transition-colors text-[#475467] hover:bg-slate-50 hover:text-[#0F1729]"><span class="material-symbols-outlined !text-[20px] text-[#98A2B3]">all_inbox</span><span class="flex-1">Inbox</span><span class="text-[11px] font-semibold px-1.5 min-w-[20px] text-center rounded-full bg-primary text-on-primary">14</span></a><a href="#" class="relative flex items-center gap-3 h-9 px-3 rounded-xl text-[14px] transition-colors text-[#475467] hover:bg-slate-50 hover:text-[#0F1729]"><span class="material-symbols-outlined !text-[20px] text-[#98A2B3]">radar</span><span class="flex-1">Radar</span></a><a href="#" class="relative flex items-center gap-3 h-9 px-3 rounded-xl text-[14px] transition-colors bg-primary/10 text-primary font-medium before:content-[''] before:absolute before:-left-3 before:top-2 before:bottom-2 before:w-1 before:rounded-r-full before:bg-primary"><span class="material-symbols-outlined !text-[20px]">calendar_today</span><span class="flex-1">Agenda</span></a><a href="#" class="relative flex items-center gap-3 h-9 px-3 rounded-xl text-[14px] transition-colors text-[#475467] hover:bg-slate-50 hover:text-[#0F1729]"><span class="material-symbols-outlined !text-[20px] text-[#98A2B3]">quickreply</span><span class="flex-1">Respostas rápidas</span></a></div></div><div><button type="button" class="w-full flex items-center justify-between px-3 pt-4 pb-1.5 text-[11px] font-semibold tracking-[0.06em] uppercase text-[#98A2B3] hover:text-[#667085]"><span>CRM</span><span class="material-symbols-outlined !text-[16px]">expand_more</span></button><div class="flex flex-col gap-0.5"><a href="#" class="relative flex items-center gap-3 h-9 px-3 rounded-xl text-[14px] transition-colors text-[#475467] hover:bg-slate-50 hover:text-[#0F1729]"><span class="material-symbols-outlined !text-[20px] text-[#98A2B3]">view_kanban</span><span class="flex-1">Funis</span></a><a href="#" class="relative flex items-center gap-3 h-9 px-3 rounded-xl text-[14px] transition-colors text-[#475467] hover:bg-slate-50 hover:text-[#0F1729]"><span class="material-symbols-outlined !text-[20px] text-[#98A2B3]">group</span><span class="flex-1">Contatos</span></a><a href="#" class="relative flex items-center gap-3 h-9 px-3 rounded-xl text-[14px] transition-colors text-[#475467] hover:bg-slate-50 hover:text-[#0F1729]"><span class="material-symbols-outlined !text-[20px] text-[#98A2B3]">domain</span><span class="flex-1">Empresas</span></a><a href="#" class="relative flex items-center gap-3 h-9 px-3 rounded-xl text-[14px] transition-colors text-[#475467] hover:bg-slate-50 hover:text-[#0F1729]"><span class="material-symbols-outlined !text-[20px] text-[#98A2B3]">check_circle</span><span class="flex-1">Tarefas</span><span class="text-[11px] font-semibold px-1.5 min-w-[20px] text-center rounded-full bg-slate-100 text-slate-500">3</span></a><a href="#" class="relative flex items-center gap-3 h-9 px-3 rounded-xl text-[14px] transition-colors text-[#475467] hover:bg-slate-50 hover:text-[#0F1729]"><span class="material-symbols-outlined !text-[20px] text-[#98A2B3]">call</span><span class="flex-1">Chamadas</span></a><a href="#" class="relative flex items-center gap-3 h-9 px-3 rounded-xl text-[14px] transition-colors text-[#475467] hover:bg-slate-50 hover:text-[#0F1729]"><span class="material-symbols-outlined !text-[20px] text-[#98A2B3]">description</span><span class="flex-1">Propostas</span></a><a href="#" class="relative flex items-center gap-3 h-9 px-3 rounded-xl text-[14px] transition-colors text-[#475467] hover:bg-slate-50 hover:text-[#0F1729]"><span class="material-symbols-outlined !text-[20px] text-[#98A2B3]">campaign</span><span class="flex-1">Campanhas</span></a><a href="#" class="relative flex items-center gap-3 h-9 px-3 rounded-xl text-[14px] transition-colors text-[#475467] hover:bg-slate-50 hover:text-[#0F1729]"><span class="material-symbols-outlined !text-[20px] text-[#98A2B3]">travel_explore</span><span class="flex-1">Prospecção</span></a></div></div><div><button type="button" class="w-full flex items-center justify-between px-3 pt-4 pb-1.5 text-[11px] font-semibold tracking-[0.06em] uppercase text-[#98A2B3] hover:text-[#667085]"><span>Inteligência artificial</span><span class="material-symbols-outlined !text-[16px]">chevron_right</span></button></div><div><button type="button" class="w-full flex items-center justify-between px-3 pt-4 pb-1.5 text-[11px] font-semibold tracking-[0.06em] uppercase text-[#98A2B3] hover:text-[#667085]"><span>Análise</span><span class="material-symbols-outlined !text-[16px]">chevron_right</span></button></div></nav>
+  <div class="px-3 pb-3 pt-2 border-t border-[#F1F3F7] flex flex-col gap-0.5">
+    <a href="#" class="flex items-center gap-3 h-9 px-3 rounded-xl text-[14px] text-[#475467] hover:bg-slate-50"><span class="material-symbols-outlined !text-[20px] text-[#98A2B3]">cable</span><span class="flex-1">Conexões</span><span class="flex items-center gap-1.5 text-[11px] text-[#667085]"><span class="w-2 h-2 rounded-full bg-emerald-500"></span>WhatsApp</span></a>
+    <a href="#" class="flex items-center gap-3 h-9 px-3 rounded-xl text-[14px] text-[#475467] hover:bg-slate-50"><span class="material-symbols-outlined !text-[20px] text-[#98A2B3]">settings</span><span class="flex-1">Configurações</span></a>
+    <button type="button" class="mt-2 flex items-center gap-3 p-2 rounded-xl hover:bg-slate-50 text-left">
+      <span class="w-9 h-9 rounded-full bg-primary/10 text-primary flex items-center justify-center text-[13px] font-semibold">RS</span>
+      <span class="leading-tight min-w-0 flex-1"><span class="block text-[13px] font-medium text-[#0F1729] truncate">Rodrigo Silveira</span><span class="block text-[11px] text-[#667085] truncate">Head de Operações</span></span>
+      <span class="material-symbols-outlined !text-[18px] text-[#98A2B3]">more_horiz</span>
+    </button>
+  </div>
+</aside><div class="pl-[288px] pr-4"><header class="fixed top-4 left-[288px] right-4 h-16 bg-surface-container-lowest rounded-[20px] shadow-[0_4px_20px_-2px_rgba(15,23,42,0.04),0_2px_6px_-1px_rgba(15,23,42,0.02)] z-40 flex items-center justify-between px-space-lg"><div class="flex items-center gap-space-md"><button class="text-secondary hover:text-on-surface p-1.5 rounded-lg hover:bg-surface-container-low transition-colors" title="Recolher menu lateral" type="button"><span class="material-symbols-outlined">dock_to_left</span></button><div class="relative flex items-center"><span class="material-symbols-outlined absolute left-3 text-outline pointer-events-none">search</span><input class="w-72 lg:w-80 h-10 pl-9 pr-16 bg-surface-container-low text-on-surface placeholder:text-outline rounded-full font-body-sm text-body-sm focus:outline-none focus:bg-surface-container-lowest focus:ring-2 focus:ring-primary-container transition-all" placeholder="Buscar conversas, contatos…" type="search"/><kbd class="absolute right-3 px-1.5 py-0.5 rounded bg-surface-container font-body-xs text-[11px] text-secondary font-medium tracking-tight">Ctrl K</kbd></div></div><div class="flex items-center gap-space-sm"><div class="hidden xl:flex items-center gap-2 px-3 py-1.5 rounded-full bg-surface-container-low"><span class="relative flex h-2 w-2"><span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span><span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span></span><span class="font-label-md text-label-md text-on-surface font-medium">Ramal 1103</span><span class="font-body-xs text-body-xs text-secondary">· conectado</span></div><div class="hidden lg:flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-surface-container-low"><span class="material-symbols-outlined text-emerald-600 text-[16px]">check_circle</span><span class="font-label-sm text-label-sm text-secondary font-medium">WhatsApp API <span class="text-on-surface font-semibold">99.9%</span></span></div><div class="h-5 w-px bg-surface-variant mx-1 hidden md:block"></div><button class="text-secondary hover:text-on-surface p-2 rounded-full hover:bg-surface-container-low transition-colors" title="Alternar Tema" type="button"><span class="material-symbols-outlined">light_mode</span></button><button class="relative text-secondary hover:text-on-surface p-2 rounded-full hover:bg-surface-container-low transition-colors" title="Notificações" type="button"><span class="material-symbols-outlined">notifications</span><span class="absolute top-2 right-2 w-2 h-2 rounded-full bg-primary ring-2 ring-surface-container-lowest"></span></button><button class="hidden sm:flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-primary text-on-primary hover:bg-primary-container font-label-md text-label-md transition-colors shadow-[0_1px_2px_rgba(236,72,153,0.2)]" type="button"><span class="material-symbols-outlined text-[17px]">add</span><span>Nova mensagem</span></button><div class="relative flex items-center"><img alt="Profile" class="w-8 h-8 rounded-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAqGdmmHaIEbQaIlqaaISMpe0QSgDM2CTDNP4U3H2TokvD0AYDUaSSBx4wWmeqz6qeEtUwvufJIyMiDUMAUAlDbQw1pVvGQ5Pxf6MdyQcTLt5Gc6XPR453fSnRv-ONTGeYFTcwl7BmrBkeJGOYGn2clBcp3RBFXVnY61najAdUvGW1L6QZ_sQLB4VsWhlDCWPYe8RNGtENme68SpFFlHfPxfLlb1nU_y4tZoTwJiBQ"/><span class="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-emerald-500 ring-2 ring-surface-container-lowest"></span></div></div></header><main class="relative pt-24 pb-8 min-h-screen"><div class="flex flex-col w-full gap-space-lg">
+<!-- Executive Filter & Action Ribbon -->
+<div class="flex flex-col lg:flex-row lg:items-center justify-between gap-space-md bg-surface-container-lowest p-space-md rounded-DEFAULT shadow-sm">
+<div class="flex flex-wrap items-center gap-space-md">
+<!-- Week & Month Navigation Control -->
+<div class="flex items-center gap-space-xs bg-surface-container-low p-1 rounded-DEFAULT">
+<button class="w-8 h-8 flex items-center justify-center rounded-DEFAULT text-secondary hover:text-on-surface hover:bg-surface-container-lowest transition-colors" title="Semana anterior" type="button">
+<span class="material-symbols-outlined text-[18px]">chevron_left</span>
+</button>
+<span class="font-headline-sm text-headline-sm text-on-surface px-space-xs tracking-tight">21 – 27 Outubro 2024</span>
+<button class="w-8 h-8 flex items-center justify-center rounded-DEFAULT text-secondary hover:text-on-surface hover:bg-surface-container-lowest transition-colors" title="Próxima semana" type="button">
+<span class="material-symbols-outlined text-[18px]">chevron_right</span>
+</button>
+</div>
+<button class="px-space-md py-1.5 rounded-DEFAULT bg-surface-container font-label-md text-label-md text-primary hover:bg-surface-container-high transition-colors" type="button">
+        Hoje
+      </button>
+<!-- Sync / Status Chip -->
+<div class="hidden sm:flex items-center gap-2 px-space-sm py-1 rounded-full bg-surface-container-low">
+<span class="w-2 h-2 rounded-full bg-primary animate-pulse"></span>
+<span class="font-label-sm text-label-sm text-secondary">Google Calendar &amp; Softphone sincronizados</span>
+</div>
+</div>
+<!-- Right Controls: View Switcher & New Booking CTA -->
+<div class="flex items-center gap-space-sm self-end lg:self-auto">
+<!-- View Granularity Switcher -->
+<div class="flex items-center p-1 bg-surface-container-low rounded-DEFAULT">
+<button class="px-3 py-1 rounded-DEFAULT font-label-md text-label-md text-secondary hover:text-on-surface transition-all" type="button">
+          Dia
+        </button>
+<button class="px-3 py-1 rounded-DEFAULT bg-surface-container-lowest text-primary shadow-sm font-label-md text-label-md transition-all" type="button">
+          Semana
+        </button>
+<button class="px-3 py-1 rounded-DEFAULT font-label-md text-label-md text-secondary hover:text-on-surface transition-all" type="button">
+          Mês
+        </button>
+</div>
+<!-- Action Button -->
+<button class="flex items-center gap-1.5 px-space-md py-2 rounded-DEFAULT bg-primary hover:bg-primary-container text-on-primary font-label-md text-label-md transition-colors shadow-sm" type="button">
+<span class="material-symbols-outlined text-[18px]">add_circle</span>
+<span>Novo Compromisso</span>
+</button>
+</div>
+</div>
+<!-- Primary Workspace Layout -->
+<div class="grid grid-cols-1 xl:grid-cols-12 gap-space-lg items-start">
+<!-- Central Calendar View (9 cols) -->
+<div class="xl:col-span-8 2xl:col-span-9 bg-surface-container-lowest rounded-DEFAULT p-space-lg shadow-sm flex flex-col overflow-hidden">
+<!-- Top Calendar Metrics & Legend Bar -->
+<div class="flex flex-wrap items-center justify-between pb-space-md mb-space-sm gap-space-sm">
+<div class="flex items-center gap-space-md">
+<div class="flex items-center gap-1.5">
+<span class="w-2.5 h-2.5 rounded-full bg-primary-container"></span>
+<span class="font-body-xs text-body-xs text-secondary">Demo Enterprise</span>
+</div>
+<div class="flex items-center gap-1.5">
+<span class="w-2.5 h-2.5 rounded-full bg-secondary-fixed"></span>
+<span class="font-body-xs text-body-xs text-secondary">Alinhamento</span>
+</div>
+<div class="flex items-center gap-1.5">
+<span class="w-2.5 h-2.5 rounded-full bg-surface-container-highest"></span>
+<span class="font-body-xs text-body-xs text-secondary">Follow-up Comercial</span>
+</div>
+<div class="flex items-center gap-1.5">
+<span class="w-2.5 h-2.5 rounded-full bg-tertiary-fixed"></span>
+<span class="font-body-xs text-body-xs text-secondary">Onboarding Técnico</span>
+</div>
+</div>
+<div class="flex items-center gap-2">
+<span class="font-body-xs text-body-xs text-secondary">Fuso: Horário de Brasília (GMT-3)</span>
+<span class="material-symbols-outlined text-[16px] text-secondary">schedule</span>
+</div>
+</div>
+<!-- Scrollable Weekly Grid -->
+<div class="overflow-x-auto">
+<div class="min-w-[760px] flex flex-col">
+<!-- Column Headers: Days of Week -->
+<div class="grid grid-cols-7 gap-1 pb-space-sm">
+<div class="w-14"></div> <!-- Time label gutter spacer -->
+<div class="flex flex-col items-center py-2 px-1 rounded-DEFAULT bg-surface-container-low text-on-surface">
+<span class="font-label-sm text-label-sm text-secondary uppercase">Seg</span>
+<span class="font-headline-md text-headline-md text-on-surface">21</span>
+</div>
+<div class="flex flex-col items-center py-2 px-1 rounded-DEFAULT bg-surface-container-low text-on-surface">
+<span class="font-label-sm text-label-sm text-secondary uppercase">Ter</span>
+<span class="font-headline-md text-headline-md text-on-surface">22</span>
+</div>
+<div class="flex flex-col items-center py-2 px-1 rounded-DEFAULT bg-surface-container-low text-on-surface">
+<span class="font-label-sm text-label-sm text-secondary uppercase">Qua</span>
+<span class="font-headline-md text-headline-md text-on-surface">23</span>
+</div>
+<!-- Active Day Indicator (Hoje) -->
+<div class="flex flex-col items-center py-2 px-1 rounded-DEFAULT bg-primary text-on-primary shadow-sm relative">
+<span class="font-label-sm text-label-sm text-primary-fixed uppercase font-semibold">Qui</span>
+<span class="font-headline-md text-headline-md text-on-primary font-bold">24</span>
+<span class="absolute -bottom-1 w-1.5 h-1.5 rounded-full bg-on-primary"></span>
+</div>
+<div class="flex flex-col items-center py-2 px-1 rounded-DEFAULT bg-surface-container-low text-on-surface">
+<span class="font-label-sm text-label-sm text-secondary uppercase">Sex</span>
+<span class="font-headline-md text-headline-md text-on-surface">25</span>
+</div>
+<div class="flex flex-col items-center py-2 px-1 rounded-DEFAULT bg-surface-container-low/60 text-secondary">
+<span class="font-label-sm text-label-sm text-secondary uppercase">Sáb</span>
+<span class="font-headline-md text-headline-md text-secondary">26</span>
+</div>
+</div>
+<!-- Hourly Timetable Body -->
+<div class="relative grid grid-cols-7 gap-1 pt-1">
+<!-- Time Markers Column -->
+<div class="flex flex-col justify-between py-2 text-right pr-2">
+<span class="font-tabular-data-sm text-tabular-data-sm text-secondary h-14">08:00</span>
+<span class="font-tabular-data-sm text-tabular-data-sm text-secondary h-14">09:00</span>
+<span class="font-tabular-data-sm text-tabular-data-sm text-secondary h-14">10:00</span>
+<span class="font-tabular-data-sm text-tabular-data-sm text-secondary h-14">11:00</span>
+<span class="font-tabular-data-sm text-tabular-data-sm text-secondary h-14">12:00</span>
+<span class="font-tabular-data-sm text-tabular-data-sm text-secondary h-14">13:00</span>
+<span class="font-tabular-data-sm text-tabular-data-sm text-secondary h-14">14:00</span>
+<span class="font-tabular-data-sm text-tabular-data-sm text-secondary h-14">15:00</span>
+<span class="font-tabular-data-sm text-tabular-data-sm text-secondary h-14">16:00</span>
+<span class="font-tabular-data-sm text-tabular-data-sm text-secondary h-14">17:00</span>
+<span class="font-tabular-data-sm text-tabular-data-sm text-secondary h-14">18:00</span>
+</div>
+<!-- Monday Grid Slot -->
+<div class="relative bg-surface-container-low/40 rounded-DEFAULT p-1 flex flex-col gap-2 min-h-[660px]">
+<!-- Event Pill -->
+<div class="absolute top-[68px] inset-x-1 p-2 rounded-DEFAULT bg-surface-container-highest text-on-surface shadow-sm cursor-pointer hover:shadow-md transition-all">
+<div class="flex items-center justify-between mb-1">
+<span class="font-tabular-data-sm text-tabular-data-sm font-semibold text-primary">09:00 - 10:00</span>
+<span class="material-symbols-outlined text-[15px] text-primary">call</span>
+</div>
+<div class="font-headline-sm text-[13px] leading-tight font-medium text-on-surface truncate">Follow-up Proposta</div>
+<div class="flex items-center gap-1.5 mt-2">
+<img class="w-4 h-4 rounded-full object-cover" data-alt="Corporate headshot of Carlos Mendes, VP of Finance, crisp studio background" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAUuEkUT_kYLTRJVZCSf4EuQy8EUrvmz7VgP8i1qbrwNQa4wX3jDM4QtWFPmCTq8oXtCR8UblfDrTHXbQjoMDbsW7nUo2_0UHu9FR34eGE3f8KfH1OtUC9vRCq4h9Msq9J-qxjoG-vpEGsSTl0-LikH9GJkgRwy21hGUFdzaT7wh73BvZKioP2EDDpPk_pDsj2SUUhrLwd_b3_A9a8O3lKawUdg5fHWug4xgZ9BOzE"/>
+<span class="font-body-xs text-[11px] text-secondary truncate">Carlos Mendes</span>
+</div>
+</div>
+<!-- Event Pill 2 -->
+<div class="absolute top-[280px] inset-x-1 p-2 rounded-DEFAULT bg-secondary-fixed text-on-surface shadow-sm cursor-pointer hover:shadow-md transition-all">
+<div class="flex items-center justify-between mb-1">
+<span class="font-tabular-data-sm text-tabular-data-sm font-semibold text-on-secondary-fixed">14:00 - 14:45</span>
+<span class="material-symbols-outlined text-[15px] text-on-secondary-fixed">videocam</span>
+</div>
+<div class="font-headline-sm text-[13px] leading-tight font-medium text-on-surface truncate">Alinhamento Jurídico</div>
+<div class="flex items-center gap-1.5 mt-2">
+<img class="w-4 h-4 rounded-full object-cover" data-alt="Portrait of Beatriz Vianna, Enterprise Legal Counsel, warm ambient office light" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCkrxat2PL5u2FnZwvlqiF34r7bg810hoIyFotpsozp1M1GVoKbLL1JuruwylTv52D3SbYv31DC-AIAtuKXK_zljfkQvZ12Qx3X9uUTfuuaK1eb2f7Kech9Fs4RbYBg5zwwYfBBHF8oa6SObxOKiGE1ylwioy-SmN1HRcdUUj8DZ9R8c0PEDJr9-2JWFQnFux1QGKdAaSgUfCoR0wqSt2CdrTQsAKOJUNX10nKQN0E"/>
+<span class="font-body-xs text-[11px] text-secondary truncate">Dra. Beatriz</span>
+</div>
+</div>
+</div>
+<!-- Tuesday Grid Slot -->
+<div class="relative bg-surface-container-low/40 rounded-DEFAULT p-1 flex flex-col gap-2 min-h-[660px]">
+<!-- Event Pill -->
+<div class="absolute top-[125px] inset-x-1 p-2 rounded-DEFAULT bg-primary-container text-on-primary shadow-sm cursor-pointer hover:shadow-md transition-all">
+<div class="flex items-center justify-between mb-1">
+<span class="font-tabular-data-sm text-tabular-data-sm font-semibold text-primary-fixed">10:00 - 11:30</span>
+<span class="material-symbols-outlined text-[15px] text-primary-fixed">videocam</span>
+</div>
+<div class="font-headline-sm text-[13px] leading-tight font-semibold text-on-primary truncate">Demo Enterprise</div>
+<div class="flex items-center gap-1.5 mt-2">
+<img class="w-4 h-4 rounded-full object-cover ring-1 ring-primary-fixed" data-alt="Professional profile of Mariana Albuquerque, Chief Revenue Officer, natural modern portrait" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCoqOUvMUQnW7zbfgRQiRPTHTqpu_jH2c-BaI3S_mWEUyimAir4p973wKAjOkdWXSm0_-Gh8ZNzUXgiBJ4uIdaOMun5lEwTqdttBfzVkaZcs1cQBkXHaM3TATcTqCq_CUjRw1jn2W8sUcjmORE-rvqAU1sNp2nT3N2fFFJtpjMLsyj66xEigIem9iLGYCEndRvf9rymlZ9IzT99UXy84bmnEYYsKLqn8QakzGTwV6A"/>
+<span class="font-body-xs text-[11px] text-primary-fixed truncate">Mariana Albeq.</span>
+</div>
+</div>
+</div>
+<!-- Wednesday Grid Slot -->
+<div class="relative bg-surface-container-low/40 rounded-DEFAULT p-1 flex flex-col gap-2 min-h-[660px]">
+<!-- Event Pill -->
+<div class="absolute top-[180px] inset-x-1 p-2 rounded-DEFAULT bg-tertiary-fixed text-on-surface shadow-sm cursor-pointer hover:shadow-md transition-all">
+<div class="flex items-center justify-between mb-1">
+<span class="font-tabular-data-sm text-tabular-data-sm font-semibold text-on-tertiary-fixed">11:00 - 12:00</span>
+<span class="material-symbols-outlined text-[15px] text-on-tertiary-fixed">terminal</span>
+</div>
+<div class="font-headline-sm text-[13px] leading-tight font-medium text-on-surface truncate">Onboarding API</div>
+<div class="flex items-center gap-1.5 mt-2">
+<img class="w-4 h-4 rounded-full object-cover" data-alt="Tech Lead Felipe Sato in enterprise data development lab smiling" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDIJaIjwJW-M2tdlzx8Ykbsk-DWwQ4gosYNfpI6lsFPGZIqHgJWsFJIGxwunogL26h2ZEP3DHz_hCZwV3WT_ii-dxY6o_egfh1ltGPjY2XvEL-gAsvwKhYkAZFWpZPyAS4JRS3DaxPw6ZA5zRG9RAnGJOtoiqoIrWtIcoX2zcQAQVInIgWkFt62Nr9VYci0T7XJG44k1p5_EPX3bIiuwu4L8r7YNmKEnYgMYWsgoss"/>
+<span class="font-body-xs text-[11px] text-secondary truncate">Felipe Sato (CTO)</span>
+</div>
+</div>
+<!-- Event Pill 2 -->
+<div class="absolute top-[400px] inset-x-1 p-2 rounded-DEFAULT bg-surface-container-highest text-on-surface shadow-sm cursor-pointer hover:shadow-md transition-all">
+<div class="flex items-center justify-between mb-1">
+<span class="font-tabular-data-sm text-tabular-data-sm font-semibold text-primary">16:00 - 16:30</span>
+<span class="material-symbols-outlined text-[15px] text-primary">call</span>
+</div>
+<div class="font-headline-sm text-[13px] leading-tight font-medium text-on-surface truncate">Alinhamento SDR</div>
+<div class="flex items-center gap-1.5 mt-2">
+<span class="w-4 h-4 rounded-full bg-primary text-on-primary text-[9px] flex items-center justify-center font-bold">RS</span>
+<span class="font-body-xs text-[11px] text-secondary truncate">Time Vendas</span>
+</div>
+</div>
+</div>
+<!-- Thursday (Today) Grid Slot -->
+<div class="relative bg-surface-container/60 rounded-DEFAULT p-1 flex flex-col gap-2 min-h-[660px]">
+<!-- Red Now-Time Current Indicator Line -->
+<div class="absolute top-[215px] inset-x-0 z-20 flex items-center pointer-events-none">
+<div class="w-2.5 h-2.5 rounded-full bg-error -ml-1 ring-2 ring-surface-container-lowest"></div>
+<div class="flex-1 h-[2px] bg-error"></div>
+<span class="font-tabular-data-sm text-[10px] text-error font-bold px-1 bg-surface-container-lowest rounded shadow-xs ml-1">11:45</span>
+</div>
+<!-- Past Meeting -->
+<div class="absolute top-[15px] inset-x-1 p-2 rounded-DEFAULT bg-surface-container-low text-secondary opacity-75 shadow-xs">
+<div class="flex items-center justify-between mb-1">
+<span class="font-tabular-data-sm text-tabular-data-sm font-medium">08:30 - 09:15</span>
+<span class="material-symbols-outlined text-[15px] text-secondary">check_circle</span>
+</div>
+<div class="font-headline-sm text-[13px] leading-tight text-on-surface line-through truncate">Standup Operações</div>
+<span class="font-body-xs text-[11px] text-secondary">Concluído</span>
+</div>
+<!-- In-Progress / Imminent Meeting -->
+<div class="absolute top-[230px] inset-x-1 p-2.5 rounded-DEFAULT bg-primary-container text-on-primary shadow-md ring-2 ring-primary transition-all z-10 cursor-pointer">
+<div class="flex items-center justify-between mb-1">
+<span class="font-tabular-data-sm text-tabular-data-sm font-bold text-primary-fixed">12:00 - 13:00</span>
+<span class="px-1.5 py-0.5 rounded-full bg-on-primary text-primary font-label-sm text-[10px] uppercase font-bold tracking-tight">Em 15 min</span>
+</div>
+<div class="font-headline-sm text-[14px] leading-tight font-bold text-on-primary truncate">Demo Enterprise Tier 1</div>
+<div class="flex items-center justify-between mt-2 pt-1">
+<div class="flex items-center gap-1.5">
+<img class="w-5 h-5 rounded-full object-cover ring-1 ring-on-primary" data-alt="Headshot of Guilherme Prado, Chief Information Officer, high contrast sharp corporate lighting" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDTU40-P01DnMBSaGO1zhAf9-SSPWVDZKpijqIvrS9ZEQYxNuBMHmKsKAT-iPTXtv2nO6LCWDl9JyE8KRHHB3vsbqttJYI5jvNumZAIGXuN5xOsR7MUPfdyqYxhgc1sE9Rf9KZb-fWO-cSfzMcUXxs4MwR5qLyZ_mWQA39ZvsPpMojGcxrjNL_WeaqdmKDF63NSUCdxI_Y4TdM5LXSiTfa3W7C4HMJ5vPTb0yOW3sM"/>
+<span class="font-body-xs text-[12px] text-primary-fixed truncate">G. Prado (OmniTech)</span>
+</div>
+<span class="material-symbols-outlined text-[16px] text-on-primary">videocam</span>
+</div>
+</div>
+<!-- Afternoon Slot -->
+<div class="absolute top-[370px] inset-x-1 p-2 rounded-DEFAULT bg-surface-container-highest text-on-surface shadow-sm cursor-pointer hover:shadow-md transition-all">
+<div class="flex items-center justify-between mb-1">
+<span class="font-tabular-data-sm text-tabular-data-sm font-semibold text-primary">15:30 - 16:15</span>
+<span class="material-symbols-outlined text-[15px] text-primary">call</span>
+</div>
+<div class="font-headline-sm text-[13px] leading-tight font-medium text-on-surface truncate">Follow-up Fechamento</div>
+<div class="flex items-center gap-1.5 mt-2">
+<img class="w-4 h-4 rounded-full object-cover" data-alt="Executive woman portrait, Clara Fontes, Procurement Director" src="https://lh3.googleusercontent.com/aida-public/AB6AXuB5gaPssVU2kigS4Ih9VfteA7fM3xr_ZepoVTz-1Q6c3OvE2rViKBYORYcWHfaG6MftwdDDpcsbwEDrSst4iRrempq5qvp6p7597mVygdUQ2ALoCvp9vEgjhDLGIOHkwMqb3DLVp31Le3XRlI87YWqsHphsefh3zVm2G6vXihqg12v3tWqmXFqHZup-aYox5l0tVLlDdnlC0yhb4hbamf540Hq9uwKMYiYuriqYOlk"/>
+<span class="font-body-xs text-[11px] text-secondary truncate">Clara Fontes</span>
+</div>
+</div>
+</div>
+<!-- Friday Grid Slot -->
+<div class="relative bg-surface-container-low/40 rounded-DEFAULT p-1 flex flex-col gap-2 min-h-[660px]">
+<!-- Event Pill -->
+<div class="absolute top-[70px] inset-x-1 p-2 rounded-DEFAULT bg-secondary-fixed text-on-surface shadow-sm cursor-pointer hover:shadow-md transition-all">
+<div class="flex items-center justify-between mb-1">
+<span class="font-tabular-data-sm text-tabular-data-sm font-semibold text-on-secondary-fixed">09:00 - 10:30</span>
+<span class="material-symbols-outlined text-[15px] text-on-secondary-fixed">group</span>
+</div>
+<div class="font-headline-sm text-[13px] leading-tight font-medium text-on-surface truncate">Revisão Semanal Sales</div>
+<div class="flex items-center gap-1.5 mt-2">
+<span class="w-4 h-4 rounded-full bg-secondary text-on-secondary text-[9px] flex items-center justify-center font-bold">12</span>
+<span class="font-body-xs text-[11px] text-secondary truncate">Sala Executiva</span>
+</div>
+</div>
+<!-- Event Pill 2 -->
+<div class="absolute top-[260px] inset-x-1 p-2 rounded-DEFAULT bg-tertiary-fixed text-on-surface shadow-sm cursor-pointer hover:shadow-md transition-all">
+<div class="flex items-center justify-between mb-1">
+<span class="font-tabular-data-sm text-tabular-data-sm font-semibold text-on-tertiary-fixed">14:00 - 15:00</span>
+<span class="material-symbols-outlined text-[15px] text-on-tertiary-fixed">videocam</span>
+</div>
+<div class="font-headline-sm text-[13px] leading-tight font-medium text-on-surface truncate">Demo Expansão SaaS</div>
+<div class="flex items-center gap-1.5 mt-2">
+<img class="w-4 h-4 rounded-full object-cover" data-alt="Portrait of Roberto Salum, Chief Digital Officer at a financial group" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDlrWVutqjQq9LRfBatCZCBNhOQzqqYUqN-zgHxZ-9MrgmjgeznVFkQS-OEpkTjveU-lBSr6bZnHMIEbsiawaVzAgN8GEzWQ54dy1Po2VcWpg7Ak_I3AJce6Ryt-TdYe0HiEHiEQfbXadcs_Z6adzD_-e_8z_OgpNqTvktBcIWvuxmDLi5lm7ZiAbqO2_R4qXw9aDq1WNdn3ISIj1zpdw0OqBgmv-uAe7ZKjlnJ8lw"/>
+<span class="font-body-xs text-[11px] text-secondary truncate">Grupo Salum</span>
+</div>
+</div>
+</div>
+<!-- Saturday Grid Slot -->
+<div class="relative bg-surface-container-low/20 rounded-DEFAULT p-1 flex flex-col gap-2 min-h-[660px]">
+<!-- Empty Slot placeholder subtle text -->
+<div class="flex items-center justify-center h-full">
+<span class="font-body-xs text-secondary/60 text-center px-2">Sem plantão agendado</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Right Contextual Drawer: Hoje · 24 de Outubro (3-4 cols) -->
+<div class="xl:col-span-4 2xl:col-span-3 flex flex-col gap-space-lg">
+<!-- Daily Summary Card -->
+<div class="bg-surface-container-lowest rounded-DEFAULT p-space-lg shadow-sm flex flex-col gap-space-md">
+<!-- Header & Date Status -->
+<div class="flex items-center justify-between">
+<div class="flex flex-col">
+<span class="font-label-sm text-label-sm text-secondary uppercase tracking-widest">Painel Operacional</span>
+<span class="font-headline-lg text-headline-lg text-on-surface">Hoje · 24 Outubro</span>
+</div>
+<span class="px-2.5 py-1 rounded-full bg-primary-fixed text-on-primary-fixed-variant font-label-md text-label-md font-semibold">
+            Ativo
+          </span>
+</div>
+<!-- Metrics Bento Highlights -->
+<div class="grid grid-cols-2 gap-space-sm">
+<div class="flex flex-col p-space-md rounded-DEFAULT bg-surface-container-low">
+<div class="flex items-center justify-between text-secondary mb-1">
+<span class="font-label-sm text-label-sm uppercase">Reuniões</span>
+<span class="material-symbols-outlined text-[18px] text-primary">videocam</span>
+</div>
+<span class="font-tabular-data-lg text-tabular-data-lg text-on-surface font-bold">4</span>
+<span class="font-body-xs text-body-xs text-secondary mt-0.5">2 concluídas</span>
+</div>
+<div class="flex flex-col p-space-md rounded-DEFAULT bg-surface-container-low">
+<div class="flex items-center justify-between text-secondary mb-1">
+<span class="font-label-sm text-label-sm uppercase">Follow-ups</span>
+<span class="material-symbols-outlined text-[18px] text-primary">ring_volume</span>
+</div>
+<span class="font-tabular-data-lg text-tabular-data-lg text-on-surface font-bold">2</span>
+<span class="font-body-xs text-body-xs text-secondary mt-0.5">R$ 180k em jogo</span>
+</div>
+</div>
+<!-- Next Meeting Action Spotlight Card -->
+<div class="bg-surface-container p-space-md rounded-DEFAULT flex flex-col gap-space-sm relative overflow-hidden">
+<div class="flex items-center justify-between">
+<span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-primary text-on-primary font-label-sm text-[10px] uppercase font-bold tracking-wider">
+<span class="w-1.5 h-1.5 rounded-full bg-on-primary animate-ping"></span>
+              Em 15 minutos
+            </span>
+<span class="font-tabular-data-sm text-tabular-data-sm font-semibold text-primary">12:00</span>
+</div>
+<div class="flex flex-col">
+<span class="font-headline-sm text-headline-sm text-on-surface font-semibold">Demo Enterprise Tier 1</span>
+<span class="font-body-sm text-body-sm text-secondary">Guilherme Prado · OmniTech Brasil</span>
+</div>
+<div class="flex items-center gap-2 pt-1">
+<a class="flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-DEFAULT bg-primary hover:bg-primary-container text-on-primary font-label-md text-label-md transition-colors shadow-sm" href="#">
+<span class="material-symbols-outlined text-[18px]">videocam</span>
+<span>Entrar na chamada</span>
+</a>
+<button class="w-9 h-9 flex items-center justify-center rounded-DEFAULT bg-surface-container-lowest text-secondary hover:text-on-surface shadow-xs transition-colors" title="Copiar link da reunião" type="button">
+<span class="material-symbols-outlined text-[18px]">content_copy</span>
+</button>
+</div>
+</div>
+<!-- Chronological Today List -->
+<div class="flex flex-col gap-space-sm pt-space-xs">
+<span class="font-label-sm text-label-sm text-secondary uppercase tracking-wider">Linha do Tempo</span>
+<!-- Item 1: Concluído -->
+<div class="flex items-start gap-space-sm p-space-sm rounded-DEFAULT bg-surface-container-low/60 hover:bg-surface-container-low transition-colors">
+<div class="w-8 h-8 rounded-full bg-surface-container-highest flex items-center justify-center text-primary flex-shrink-0 mt-0.5">
+<span class="material-symbols-outlined text-[16px]">check</span>
+</div>
+<div class="flex flex-col flex-1 min-w-0">
+<div class="flex items-center justify-between">
+<span class="font-headline-sm text-[13px] text-on-surface font-medium truncate">Standup Operações</span>
+<span class="font-tabular-data-sm text-[11px] text-secondary">08:30</span>
+</div>
+<span class="font-body-xs text-body-xs text-secondary truncate">Alinhamento de metas da semana</span>
+<span class="font-label-sm text-[10px] text-secondary mt-1">Status: Concluído</span>
+</div>
+</div>
+<!-- Item 2: Concluído -->
+<div class="flex items-start gap-space-sm p-space-sm rounded-DEFAULT bg-surface-container-low/60 hover:bg-surface-container-low transition-colors">
+<div class="w-8 h-8 rounded-full bg-surface-container-highest flex items-center justify-center text-primary flex-shrink-0 mt-0.5">
+<span class="material-symbols-outlined text-[16px]">check</span>
+</div>
+<div class="flex flex-col flex-1 min-w-0">
+<div class="flex items-center justify-between">
+<span class="font-headline-sm text-[13px] text-on-surface font-medium truncate">Qualificação SDR #402</span>
+<span class="font-tabular-data-sm text-[11px] text-secondary">10:15</span>
+</div>
+<span class="font-body-xs text-body-xs text-secondary truncate">Logística TransVale · R$ 45k ARR</span>
+<span class="font-label-sm text-[10px] text-secondary mt-1">Status: Lead Qualificado</span>
+</div>
+</div>
+<!-- Item 3: Agendado Tarde -->
+<div class="flex items-start gap-space-sm p-space-sm rounded-DEFAULT bg-surface-container-low hover:bg-surface-container transition-colors">
+<div class="w-8 h-8 rounded-full bg-primary-fixed flex items-center justify-center text-primary flex-shrink-0 mt-0.5">
+<span class="material-symbols-outlined text-[16px]">phone_in_talk</span>
+</div>
+<div class="flex flex-col flex-1 min-w-0">
+<div class="flex items-center justify-between">
+<span class="font-headline-sm text-[13px] text-on-surface font-semibold truncate">Follow-up Fechamento</span>
+<span class="font-tabular-data-sm text-[11px] text-primary font-bold">15:30</span>
+</div>
+<span class="font-body-xs text-body-xs text-secondary truncate">Clara Fontes (Diretoria Suprimentos)</span>
+<div class="flex items-center gap-2 mt-2">
+<button class="inline-flex items-center gap-1 px-2.5 py-1 rounded-DEFAULT bg-surface-container-lowest text-primary hover:bg-primary hover:text-on-primary font-label-sm text-[11px] font-semibold transition-colors shadow-xs" type="button">
+<span class="material-symbols-outlined text-[14px]">call</span>
+<span>Discar softphone</span>
+</button>
+</div>
+</div>
+</div>
+<!-- Item 4: Agendado Fim do Dia -->
+<div class="flex items-start gap-space-sm p-space-sm rounded-DEFAULT bg-surface-container-low hover:bg-surface-container transition-colors">
+<div class="w-8 h-8 rounded-full bg-surface-container-high flex items-center justify-center text-secondary flex-shrink-0 mt-0.5">
+<span class="material-symbols-outlined text-[16px]">groups</span>
+</div>
+<div class="flex flex-col flex-1 min-w-0">
+<div class="flex items-center justify-between">
+<span class="font-headline-sm text-[13px] text-on-surface font-medium truncate">Debriefing de Pipeline</span>
+<span class="font-tabular-data-sm text-[11px] text-secondary">17:30</span>
+</div>
+<span class="font-body-xs text-body-xs text-secondary truncate">Com Head de Operações</span>
+<span class="font-label-sm text-[10px] text-secondary mt-1">Agendado</span>
+</div>
+</div>
+</div>
+<!-- Quick Agenda Notes Widget -->
+<div class="pt-space-xs flex flex-col gap-space-xs">
+<div class="flex items-center justify-between">
+<span class="font-label-sm text-label-sm text-secondary uppercase tracking-wider">Notas Rápidas da Reunião</span>
+<span class="material-symbols-outlined text-[16px] text-secondary">edit_note</span>
+</div>
+<div class="relative">
+<textarea class="w-full p-2.5 rounded-DEFAULT bg-surface-container-low text-on-surface placeholder:text-outline font-body-sm text-body-sm focus:outline-none focus:ring-2 focus:ring-primary focus:bg-surface-container-lowest transition-all resize-none" placeholder="Adicionar notas para a chamada das 12:00 com OmniTech..." rows="3"></textarea>
+<div class="flex items-center justify-between pt-1 px-1">
+<span class="font-body-xs text-[11px] text-secondary">Salvo automaticamente</span>
+<button class="font-label-sm text-[11px] text-primary font-semibold hover:underline" type="button">Fixar no Lead</button>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Softphone Floating HUD Mini Dock (Discreto) -->
+<div class="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-space-md px- space-md py-2.5 px-4 rounded-full bg-inverse-surface text-inverse-on-surface shadow-xl">
+<div class="flex items-center gap-2">
+<div class="flex items-center gap-0.5 h-4">
+<span class="w-[2px] h-2 bg-primary-container rounded-full animate-pulse"></span>
+<span class="w-[2px] h-4 bg-primary-container rounded-full animate-pulse delay-75"></span>
+<span class="w-[2px] h-3 bg-primary-container rounded-full animate-pulse delay-150"></span>
+<span class="w-[2px] h-1 bg-primary-container rounded-full animate-pulse"></span>
+</div>
+<div class="flex flex-col">
+<span class="font-label-sm text-[11px] text-inverse-on-surface leading-none font-semibold">Softphone Pronto</span>
+<span class="font-body-xs text-[10px] text-outline-variant leading-tight">Ramal 1103 · Fila Vendas</span>
+</div>
+</div>
+<div class="h-4 w-px bg-surface-variant/30"></div>
+<div class="flex items-center gap-1.5">
+<button class="w-7 h-7 flex items-center justify-center rounded-full bg-surface-container-highest/20 hover:bg-surface-container-highest/30 text-inverse-on-surface transition-colors" title="Teclado numérico" type="button">
+<span class="material-symbols-outlined text-[15px]">dialpad</span>
+</button>
+<button class="w-7 h-7 flex items-center justify-center rounded-full bg-surface-container-highest/20 hover:bg-surface-container-highest/30 text-inverse-on-surface transition-colors" title="Histórico de chamadas" type="button">
+<span class="material-symbols-outlined text-[15px]">history</span>
+</button>
+<button class="flex items-center gap-1 px-2.5 py-1 rounded-full bg-primary-container text-on-primary hover:bg-primary font-label-sm text-[11px] font-semibold transition-colors" type="button">
+<span class="material-symbols-outlined text-[14px]">call</span>
+<span>Discar</span>
+</button>
+</div>
+</div>
+</div></main></div></body></html>
