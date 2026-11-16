@@ -372,6 +372,10 @@ async function receberMensagem(
     requestId: entrada.requestId,
     origem: "chat_externo_webhook",
     canal: CANAL_DA_CONVERSA,
+    // Atendimento ao vivo com botão próprio de "Encerrar atendimento": ali "sair" é sair do chat, não pedir
+    // para nunca mais receber mensagem. Achado na prova pela tela em 16/11/2026 (o contato de teste foi
+    // bloqueado ao digitar "#sair"). O agente continua escalando ao humano diante de um pedido provável.
+    optOutPorPalavra: false,
   });
 
   return { status: "ingested", conversationId: conversa.id, messageId };

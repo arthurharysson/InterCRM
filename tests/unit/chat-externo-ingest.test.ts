@@ -287,7 +287,7 @@ describe("message", () => {
     expect(aplicarEfeitosPosEntrada).toHaveBeenCalledTimes(1);
     expect(aplicarEfeitosPosEntrada).toHaveBeenCalledWith(
       admin,
-      expect.objectContaining({ organizationId: ORG, texto: "Minha internet caiu", origem: "chat_externo_webhook", canal: "web" }),
+      expect.objectContaining({ organizationId: ORG, texto: "Minha internet caiu", origem: "chat_externo_webhook", canal: "web", optOutPorPalavra: false }),
     );
   });
 

@@ -131,6 +131,20 @@ export interface EntradaDeMensagem {
    * nascia com `source = 'whatsapp'`.
    */
   canal?: string;
+  /**
+   * `false` desliga SÓ o bloqueio por palavra ("sair", "parar") para esta entrada. Ausente ou `true`: a regra de
+   * sempre.
+   *
+   * ⚠️ É uma EXCEÇÃO, e a regra continua sendo bloquear. Só um canal de ATENDIMENTO AO VIVO, onde a pessoa já está
+   * numa conversa com um humano e tem um botão próprio de encerrar, pode pedir isto: lá "sair" quer dizer "sair do
+   * chat", não "nunca mais me escreva" — e o bloqueio, por ser um estado que só uma pessoa desfaz, trancaria o
+   * atendimento (e, se o contato voltar pelo CPF, a próxima conversa também).
+   *
+   * O que NÃO muda: o agente continua parando de responder e escalando ao humano diante de um pedido provável de
+   * parar (`human-handoff.ts`), que é o sinal conservador; quem decide silenciar para sempre segue sendo uma pessoa.
+   * Hoje só o chat externo (`lib/channels/chat-externo/ingest.ts`) usa — uma exceção por canal, nunca por origem.
+   */
+  optOutPorPalavra?: boolean;
 }
 
 /**
@@ -458,6 +472,8 @@ async function ehContatoPessoal(admin: Admin, entrada: EntradaDeMensagem): Promi
  * é justamente o que prova, depois, que o pedido chegou e foi respeitado.
  */
 async function aplicarOptOut(admin: Admin, entrada: EntradaDeMensagem): Promise<void> {
+  // Exceção declarada pelo canal (ver `optOutPorPalavra`): atendimento ao vivo com botão próprio de encerrar.
+  if (entrada.optOutPorPalavra === false) return;
   if (!ehPedidoDeOptOut(entrada.texto)) return;
 
   try {
