@@ -115,7 +115,32 @@ O CRM precisa do endereço do Chat para criar o canal, e o Chat precisa das chav
 | Contato sem CPF | Falta a chave de CPF no CRM (§3, passo 5) |
 | Bot recebe 404 | URL errada: é `/api/v1/chats`, não `/v1/chats` |
 
-## 8. Fora do alcance desta versão
+## 8. Evidências (prova pela tela)
+
+**Jornada do administrador no CRM** — spec `tests/e2e/canal-chat-externo.spec.ts`, banco fresco e Supabase local:
+
+| Captura | O que mostra |
+|---|---|
+| `evidence/canal-chat-externo/1-setor-formulario.png` | Equipe › Setores, com o campo "Código para o bot" |
+| `evidence/canal-chat-externo/1-setor-criado.png` | O setor criado com o código |
+| `evidence/canal-chat-externo/2-conexoes-chat-vazio.png` | Conexões › Chat fora do WhatsApp, antes de criar o canal |
+| `evidence/canal-chat-externo/2-chaves-mostradas-uma-vez.png` | As três chaves, mostradas uma única vez |
+| `evidence/canal-chat-externo/3-canal-pronto-sem-chaves.png` | Depois de recarregar: canal pronto e as chaves não aparecem de novo |
+| `evidence/canal-chat-externo/4-conversa-na-fila-com-historico.png` | A conversa na Fila, com histórico do bot e setor |
+| `evidence/canal-chat-externo/5-mensagem-do-cliente.png` | A mensagem do cliente chegando na conversa |
+| `evidence/canal-chat-externo/6-chaves-giradas.png` | Girar as chaves: as novas aparecem uma vez |
+
+**Ida e volta com o Chat App real** (Docker + MySQL 8.4), prova de 16/11/2026:
+
+| Captura | O que mostra |
+|---|---|
+| `evidence/canal-chat-externo-ponta-a-ponta/1-cliente-abre-o-link.png` | O cliente abre o link que o bot gerou |
+| `evidence/canal-chat-externo-ponta-a-ponta/2-cliente-no-chat.png` | A página do chat, com o aviso de privacidade |
+| `evidence/canal-chat-externo-ponta-a-ponta/3-cliente-enviou.png` | O cliente envia a primeira mensagem |
+| `evidence/canal-chat-externo-ponta-a-ponta/4-atendente-ve-na-fila.png` | O atendente vê, na Fila do CRM, histórico, setor e a mensagem nova |
+| `evidence/canal-chat-externo-ponta-a-ponta/5-cliente-recebe-resposta.png` | A resposta do atendente aparece na página do cliente |
+
+## 9. Fora do alcance desta versão
 
 Reenvio automático de saída do CRM, cliente encerrando e fechando a conversa no CRM, selo/alertas por setor, LGPD
 cruzada entre os dois sistemas e reenvio do botão pelo bot (decisão P10 do Chat, em aberto).

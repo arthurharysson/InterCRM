@@ -160,6 +160,12 @@ DeskcommCRM é um sistema operacional de vendas open source com agentes de IA na
   O Jev (`lib/ai/decisao/pedidos.ts`) só é perguntado onde esta regra disse não, e nunca bloqueia
   ninguém — no máximo abre um aviso na Central ("Avisar a equipe"): a regra continua a única que bloqueia
   (cerca: `tests/unit/jev-nunca-cala-bloqueia-nem-responde.test.ts`).
+  **Uma exceção por canal, e só uma hoje:** o chat externo (atendimento ao vivo com botão próprio de
+  encerrar) entra com `optOutPorPalavra: false` em `aplicarEfeitosPosEntrada`, e ali "sair" NÃO grava
+  `is_blocked` — quem digita "sair" num chat de suporte quer sair do chat, e o bloqueio (estado que só uma
+  pessoa desfaz) trancaria o atendimento e a próxima conversa do mesmo CPF. O agente segue escalando ao
+  humano diante de pedido provável. A exceção é opt-in por entrada, nunca por `origem` (rótulo que não decide
+  nada); canal novo que não for atendimento ao vivo não a usa. Medido na prova pela tela de 16/11/2026.
 - Mídia: subir pro Supabase Storage primeiro, passar URL ao WAHA (não inline base64)
 - Multi-device: assinar `message.any` (não só `message`); tratar `fromMe=true` sem duplicar
 - Grupos: entram **só os ligados** em Conexões › Grupos (`channel_session_groups`). O grupo ligado vira conversa `is_group` com um contato `kind = 'whatsapp_group'` que nunca entra em funil, lista, campanha ou IA; o remetente é `p.author` (nunca `p.from`), gravado em `messages.metadata.group_sender` (`lib/messaging/remetente-de-grupo.ts`). Para conversa de grupo o banco emite `message.group_received`, e não `message.received`, e o roteamento automático pula grupo. O filtro `ignore.groups` do WAHA é propriedade desta funcionalidade (`definirRecebimentoDeGrupos`); compatibilidade e convergência não o tocam. Spec: `docs/superpowers/specs/2026-09-23-grupos-na-inbox-design.md`

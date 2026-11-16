@@ -369,6 +369,31 @@ describe("opt-out", () => {
     );
   });
 
+  it("optOutPorPalavra:false (atendimento ao vivo) NÃO bloqueia, e o resto da ingestão segue", async () => {
+    // O canal declara a exceção: lá "sair" é sair do chat, e o bloqueio trancaria o atendimento.
+    for (const texto of ["#sair", "sair", "PARAR", "STOP"]) {
+      ultimoUpdate = null;
+      audit.mockClear();
+      await rodar({ texto, optOutPorPalavra: false });
+      expect(ultimoUpdate, `"${texto}" bloqueou mesmo com a exceção do canal`).toBeNull();
+      expect(audit).not.toHaveBeenCalledWith(expect.objectContaining({ action: "contact.blocked" }));
+    }
+    // só o bloqueio sai: o negócio, a demanda e o agente continuam nascendo
+    expect(garantirLeadDaConversa).toHaveBeenCalled();
+    expect(sequencia).toContain("rpc:ai_agent.dispatch_requested");
+  });
+
+  it("sem a exceção (ausente ou true) a regra de sempre vale: a exceção é opt-in por entrada", async () => {
+    for (const over of [{}, { optOutPorPalavra: true }]) {
+      ultimoUpdate = null;
+      await rodar({ texto: "#sair", ...over });
+      expect(ultimoUpdate, `${JSON.stringify(over)} deixou de bloquear`).toMatchObject({
+        is_blocked: true,
+        blocked_reason: "stop_keyword",
+      });
+    }
+  });
+
   it("falha ao gravar o bloqueio NÃO impede o resto da ingestão", async () => {
     // A mensagem já está gravada. Derrubar aqui devolveria 500 ao provider, que
     // reenviaria tudo — trocaria um efeito faltando por uma tempestade.
