@@ -41,7 +41,73 @@ describe("message", () => {
         text: "Olá, preciso de ajuda com a minha internet",
         sent_at: "2026-11-13T14:00:00.000Z",
         sender_name: "Maria",
+        attachments: [],
       },
+    });
+  });
+
+  describe("anexos (o Chat manda a URL assinada; o CRM baixa depois)", () => {
+    const corpo = (attachments: unknown, extra: Record<string, unknown> = {}) =>
+      JSON.stringify({ event: "message", identity: ID, message_id: "m1", text: "", attachments, ...extra });
+    const URL_DO_ARQUIVO = "https://chat.exemplo.com.br/api/files/abc?exp=1&sig=ff";
+
+    it("lê o anexo com tipo, tamanho e nome; o `kind` sai do mime quando o Chat não manda", () => {
+      const r = lerEventoDoChat(
+        corpo([
+          { kind: "image", url: URL_DO_ARQUIVO, mime: "image/jpeg", size: 183422, name: "foto.jpg" },
+          { url: URL_DO_ARQUIVO + "2", mime: "application/pdf", size: 900, name: "contrato.pdf" },
+        ]),
+      );
+      expect(r).toMatchObject({
+        ok: true,
+        evento: {
+          text: "",
+          attachments: [
+            { kind: "image", url: URL_DO_ARQUIVO, mime: "image/jpeg", size: 183422, name: "foto.jpg" },
+            { kind: "document", url: URL_DO_ARQUIVO + "2", mime: "application/pdf", size: 900, name: "contrato.pdf" },
+          ],
+        },
+      });
+    });
+
+    it("sem o campo, ou com algo que não é lista, não há anexo (e a mensagem segue)", () => {
+      for (const attachments of [undefined, null, "foto.jpg", { url: URL_DO_ARQUIVO }]) {
+        expect(lerEventoDoChat(corpo(attachments, { text: "oi" }))).toMatchObject({
+          ok: true,
+          evento: { text: "oi", attachments: [] },
+        });
+      }
+    });
+
+    it("item sem URL, com esquema que não é web ou enorme é DESCARTADO; o resto passa", () => {
+      const r = lerEventoDoChat(
+        corpo([
+          { kind: "image", mime: "image/png" },
+          { url: "javascript:alert(1)", mime: "image/png" },
+          { url: "file:///etc/passwd" },
+          { url: "https://x.test/" + "a".repeat(2100) },
+          "texto solto",
+          null,
+          { url: URL_DO_ARQUIVO, mime: "image/png" },
+        ]),
+      );
+      expect(r).toMatchObject({ ok: true, evento: { attachments: [{ url: URL_DO_ARQUIVO, mime: "image/png" }] } });
+    });
+
+    it("campo opcional ruim (tamanho negativo, nome com controle) vira nulo, sem perder o anexo", () => {
+      const r = lerEventoDoChat(
+        corpo([{ url: URL_DO_ARQUIVO, mime: "image/png", size: -5, name: "fo\u0000to‮.png" }]),
+      );
+      expect(r).toMatchObject({
+        ok: true,
+        evento: { attachments: [{ url: URL_DO_ARQUIVO, size: null, name: "foto.png" }] },
+      });
+    });
+
+    it("no máximo 10 anexos por mensagem (o resto é ignorado)", () => {
+      const muitos = Array.from({ length: 14 }, (_, i) => ({ url: `${URL_DO_ARQUIVO}${i}`, mime: "image/png" }));
+      const r = lerEventoDoChat(corpo(muitos));
+      expect(r.ok && r.evento.event === "message" && r.evento.attachments).toHaveLength(10);
     });
   });
 

@@ -12,6 +12,7 @@
  * ganho. Os campos escolhidos pela organização vêm da preferência que JÁ existe
  * (`organizations.interface_settings.compras_campos`) — nenhuma tabela nova.
  */
+import { getUserDaRequisicao } from "@/lib/auth/sessao-da-requisicao";
 import { randomUUID } from "node:crypto";
 import { type NextRequest } from "next/server";
 
@@ -40,7 +41,7 @@ export async function GET(
   const {
     data: { user },
     error: authErr,
-  } = await supabase.auth.getUser();
+  } = await getUserDaRequisicao();
   if (authErr || !user) {
     return fail("unauthenticated", "Auth required.", 401, { requestId });
   }

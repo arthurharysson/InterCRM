@@ -7,7 +7,9 @@ em `INTEGRACAO-COM-O-CRM.md`.
 > **Estado em 16/11/2026.** Verificado com os dois sistemas reais (CRM local + Chat em Docker com MySQL 8.4): o bot
 > cria o chat, o cliente abre o link e vê o histórico, o atendente vê contato, setor, CPF e mensagens na Fila, e a
 > resposta do atendente aparece na página do cliente. **Não verificado:** a volta CRM → Chat por **https público**
-> (no teste local o anti-SSRF recusa destino local), anexos entre os dois sistemas e o proxy HTTPS do Chat.
+> (no teste local o anti-SSRF recusa destino local) e o proxy HTTPS do Chat. **Anexos** entre os dois sistemas
+> foram implementados em 17/11/2026 (§9) e cobertos por teste unitário; **não foram provados com os dois sistemas
+> reais** — o primeiro teste com uma foto de verdade, nos dois sentidos, é o que falta.
 
 ## 1. Como as peças se encaixam
 
@@ -140,7 +142,45 @@ O CRM precisa do endereço do Chat para criar o canal, e o Chat precisa das chav
 | `evidence/canal-chat-externo-ponta-a-ponta/4-atendente-ve-na-fila.png` | O atendente vê, na Fila do CRM, histórico, setor e a mensagem nova |
 | `evidence/canal-chat-externo-ponta-a-ponta/5-cliente-recebe-resposta.png` | A resposta do atendente aparece na página do cliente |
 
-## 9. Fora do alcance desta versão
+## 9. Anexos (fotos e documentos)
 
-Reenvio automático de saída do CRM, cliente encerrando e fechando a conversa no CRM, selo/alertas por setor, LGPD
-cruzada entre os dois sistemas e reenvio do botão pelo bot (decisão P10 do Chat, em aberto).
+**Cliente → atendente.** O cliente anexa na página; o Chat guarda o arquivo e manda ao CRM, no evento `message`, só a
+**URL assinada** (vale 1 h). O CRM grava a mensagem na hora (aparece no Inbox como imagem ou documento, com o nome do
+arquivo) e pede ao **worker de mídia** — o mesmo dos outros canais — que baixe e guarde uma cópia no Storage privado
+(`whatsapp-media`). Daí em diante a imagem abre pelo Inbox e entra na leitura da IA como qualquer foto. Uma mensagem
+com N anexos vira N linhas: o texto na primeira e um anexo por linha.
+
+O que o CRM confere antes de baixar: a URL tem de ser do **mesmo host** do endereço do Chat cadastrado no canal (o
+payload não escolhe para onde o servidor vai), passar no anti-SSRF, não redireciona, não leva segredo nenhum e tem
+teto de **10 MB**. Link vencido (410), arquivo apagado (404) ou assinatura inválida (403) viram falha da mídia com o
+status no registro — a mensagem e o texto continuam na conversa.
+
+**Atendente → cliente.** O anexo que o atendente envia vai ao Chat como `attachments` com a **URL assinada do Storage
+do CRM** (vale 10 min); o Chat a baixa na hora e guarda a cópia dele. Só entra **foto, PDF, TXT, DOCX e XLSX**: o que
+o Chat não aceita (áudio, vídeo) ele mostra ao cliente como "anexo indisponível", sem derrubar a mensagem.
+
+> **Configure no Chat:** o Chat só baixa anexo do atendente dos domínios que listar. Por padrão é só o domínio do CRM,
+> e a URL assinada é do **Storage** (outro domínio). Sem isto, todo anexo do atendente chega como indisponível. Em
+> `ATTACHMENT_FETCH_ALLOWED_HOSTS` (`.env` do Chat), liste o host do Storage do CRM — o `host` de
+> `NEXT_PUBLIC_SUPABASE_URL`/`SUPABASE_URL` do CRM, com `:porta` se houver. Confira também que `ATTACHMENTS_DIR` é um
+> volume persistente (`OPERACAO.md` §9.1 do Chat).
+
+| Sintoma | Causa provável |
+|---|---|
+| Foto do cliente aparece como imagem sem conteúdo | O worker de mídia ainda não baixou (espere) ou o link de 1 h venceu antes — o registro da mídia diz `chat_externo_media_failed_410` |
+| `chat_externo_media_host_blocked` | O host da URL do anexo não é o do endereço do Chat cadastrado no canal |
+| Anexo do atendente chega "indisponível" ao cliente | `ATTACHMENT_FETCH_ALLOWED_HOSTS` do Chat sem o host do Storage, ou tipo que o Chat não aceita |
+
+## 10. Fora do alcance desta versão
+
+Reenvio **durável** da saída do CRM (fila + worker), selo/alertas por setor, LGPD cruzada entre os dois sistemas e
+reenvio do botão pelo bot (decisão P10 do Chat, em aberto).
+
+Já tratado: a **falha passageira do Chat** (ele reiniciando num deploy: 502/503/504 ou conexão recusada) é reenviada
+na hora, até 3 tentativas em ~1,6 s, com o mesmo `message_id` — o Chat deduplica, então não duplica. Fora do ar por
+mais tempo que isso, a mensagem ainda falha e o atendente a reenvia pelo botão da bolha. Timeout e erro 4xx não são
+reenviados.
+
+Também já tratado: o **cliente que encerra pela página** fecha a conversa no CRM (aviso de sistema na linha do tempo +
+`fn_service_status`, a mesma RPC do botão "Encerrar"; auditado como `conversation.closed` com
+`via: chat_externo`). Se o banco falhar nessa hora, o CRM responde 5xx e o Chat reenvia.

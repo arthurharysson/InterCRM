@@ -11,6 +11,7 @@ import { ApiError } from "@/lib/api/types";
 import { ok, fail } from "@/lib/api/wrappers";
 import { orgAtivaDaApi, requireRole } from "@/lib/auth/require-role";
 import { loadAuthUser } from "@/lib/auth/server";
+import { getUserDaRequisicao } from "@/lib/auth/sessao-da-requisicao";
 import { traduzir } from "@/lib/i18n/dicionario";
 import { patchConversationSchema, validateRequest } from "@/lib/schemas";
 import { createClient } from "@/lib/supabase/server";
@@ -61,7 +62,7 @@ export async function GET(_req: NextRequest, ctx: RouteCtx): Promise<Response> {
   const {
     data: { user },
     error: authErr,
-  } = await supabase.auth.getUser();
+  } = await getUserDaRequisicao();
   if (authErr || !user) {
     return fail("unauthenticated", "Auth required.", 401, { requestId });
   }

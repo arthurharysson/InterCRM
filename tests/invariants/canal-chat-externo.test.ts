@@ -212,3 +212,105 @@ describe("os INSERTs que a ingestão do chat faz, contra o schema de verdade", (
     );
   });
 });
+
+describe("o fechamento pelo cliente e os anexos, contra o schema de verdade", () => {
+  /** Contato + conversa do chat, como a ingestão os cria. */
+  async function conversaDoChat() {
+    const canal = await criarCanal(org, "principal");
+    const contato = await query(
+      `insert into contacts(organization_id, social_identity, name, display_name, source, kind)
+       values($1,$2,'Maria','Maria','web','person') returning id`,
+      [org, IDENTIDADE],
+    );
+    const contactId = contato.rows[0].id as string;
+    const conversa = await query("select fn_upsert_wa_conversation($1,$2,$3) as id", [org, contactId, canal]);
+    const conversationId = conversa.rows[0].id as string;
+    await query("update conversations set provider_conversation_id=$2, channel='web' where id=$1", [conversationId, IDENTIDADE]);
+    return { canal, contactId, conversationId };
+  }
+
+  it("fn_service_status FECHA a conversa e é idempotente: a segunda chamada não mexe em nada", async () => {
+    const { conversationId } = await conversaDoChat();
+    const antes = await query("select status, service_revision, service_closed_at from conversations where id=$1", [conversationId]);
+    expect(["open", "pending"]).toContain(antes.rows[0].status);
+
+    // a MESMA chamada da ingestão (`chat.closed_by_customer`): sem `p_expected`
+    const primeira = await query("select status, service_revision, service_closed_at from fn_service_status($1,$2,'closed')", [org, conversationId]);
+    expect(primeira.rows[0].status).toBe("closed");
+    expect(Number(primeira.rows[0].service_revision)).toBe(Number(antes.rows[0].service_revision) + 1);
+    expect(primeira.rows[0].service_closed_at).not.toBeNull();
+
+    // o reenvio do Chat: já está fechada → devolve a linha, sem nova revisão nem novo carimbo
+    const segunda = await query("select status, service_revision, service_closed_at from fn_service_status($1,$2,'closed')", [org, conversationId]);
+    expect(segunda.rows[0].status).toBe("closed");
+    expect(Number(segunda.rows[0].service_revision)).toBe(Number(primeira.rows[0].service_revision));
+    expect(segunda.rows[0].service_closed_at).toEqual(primeira.rows[0].service_closed_at);
+
+    const lida = await query("select status from conversations where id=$1", [conversationId]);
+    expect(lida.rows[0].status).toBe("closed");
+  });
+
+  it("conversa que não existe: a RPC devolve P0002 (a ingestão trata como 'nada a fechar', não como erro)", async () => {
+    expect(await violacao("select fn_service_status($1,'00000000-0000-4000-8000-0000000000aa','closed')", [org])).toBe("P0002");
+  });
+
+  it("a RPC não alcança conversa de OUTRA organização", async () => {
+    const { conversationId } = await conversaDoChat();
+    expect(await violacao("select fn_service_status($1,$2,'closed')", [OUTRA_ORG, conversationId])).toBe("P0002");
+    const lida = await query("select status from conversations where id=$1", [conversationId]);
+    expect(["open", "pending"]).toContain(lida.rows[0].status);
+  });
+
+  it("as linhas de anexo (imagem e documento, texto na 1ª) entram, e o reenvio de cada uma é recusado pela unicidade", async () => {
+    const { canal, contactId, conversationId } = await conversaDoChat();
+    const URL_1 = "https://chat.exemplo.com.br/api/files/a1?exp=9&sig=aa";
+    const URL_2 = "https://chat.exemplo.com.br/api/files/a2?exp=9&sig=bb";
+    const inserir = (externalId: string, tipo: string, corpo: string, url: string, mime: string, nome: string) =>
+      query(
+        `insert into messages(organization_id, conversation_id, contact_id, channel_session_id, external_id, direction,
+                              sent_via, status, type, body, media_url, media_mime, metadata)
+         values($1,$2,$3,$4,$5,'inbound','external_device','delivered',$6,$7,$8,$9,
+                jsonb_build_object('source','chat_externo','media_filename',$10::text))
+         returning id`,
+        [org, conversationId, contactId, canal, externalId, tipo, corpo, url, mime, nome],
+      );
+
+    const foto = await inserir("m1", "image", "Segue a foto e o contrato", URL_1, "image/jpeg", "foto.jpg");
+    await inserir("m1:anexo2", "document", "", URL_2, "application/pdf", "contrato.pdf");
+
+    const lidas = await query(
+      "select external_id, type, body, media_url, media_mime, metadata->>'media_filename' as nome, media_storage_path from messages where conversation_id=$1 order by external_id",
+      [conversationId],
+    );
+    expect(lidas.rows).toEqual([
+      { external_id: "m1", type: "image", body: "Segue a foto e o contrato", media_url: URL_1, media_mime: "image/jpeg", nome: "foto.jpg", media_storage_path: null },
+      { external_id: "m1:anexo2", type: "document", body: "", media_url: URL_2, media_mime: "application/pdf", nome: "contrato.pdf", media_storage_path: null },
+    ]);
+
+    // o reenvio do mesmo evento: cada linha bate na unicidade (a ingestão lê o 23505 como "já gravei")
+    expect(await violacao(
+      `insert into messages(organization_id, conversation_id, contact_id, channel_session_id, external_id, direction, sent_via, status, type, body)
+       values($1,$2,$3,$4,'m1','inbound','external_device','delivered','image','')`,
+      [org, conversationId, contactId, canal],
+    )).toBe("23505");
+    expect(await violacao(
+      `insert into messages(organization_id, conversation_id, contact_id, channel_session_id, external_id, direction, sent_via, status, type, body)
+       values($1,$2,$3,$4,'m1:anexo2','inbound','external_device','delivered','document','')`,
+      [org, conversationId, contactId, canal],
+    )).toBe("23505");
+
+    // e o pedido de persistência (mesma chamada da ingestão) é aceito, ligado à mensagem de verdade
+    const mensagemId = foto.rows[0].id as string;
+    await query(
+      `select emit_event(p_event_type => 'media.persist_requested', p_entity_kind => 'message', p_entity_id => $1::uuid,
+                         p_payload => jsonb_build_object('message_id', $1::text, 'conversation_id', $2::text),
+                         p_metadata => '{"source":"chat_externo_webhook"}'::jsonb, p_organization_id => $3::uuid)`,
+      [mensagemId, conversationId, org],
+    );
+    const evento = await query(
+      "select event_type, payload->>'message_id' as message_id from event_log where organization_id=$1 and entity_id=$2 and event_type='media.persist_requested'",
+      [org, mensagemId],
+    );
+    expect(evento.rows).toEqual([{ event_type: "media.persist_requested", message_id: mensagemId }]);
+  });
+});

@@ -67,7 +67,23 @@ beforeEach(() => {
   fetchSpy = vi.fn().mockResolvedValue(new Response("{}", { status: 200 }));
   vi.stubGlobal("fetch", fetchSpy);
 });
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => {
+  vi.useRealTimers();
+  vi.unstubAllGlobals();
+});
+
+/** As esperas entre tentativas são de verdade (setTimeout): com relógio falso, avança por cima de todas. */
+async function depoisDasEsperas<T>(operacao: Promise<T>): Promise<T> {
+  await vi.advanceTimersByTimeAsync(10_000);
+  return operacao;
+}
+
+/** Como acima, mas para a operação que termina em erro (a rejeição precisa ser observada ANTES de avançar). */
+async function rejeitaDepoisDasEsperas(operacao: Promise<unknown>, mensagem: string): Promise<void> {
+  const observada = expect(operacao).rejects.toThrow(mensagem);
+  await vi.advanceTimersByTimeAsync(10_000);
+  await observada;
+}
 
 describe("adapter de saída", () => {
   it("envia um POST assinado com o segredo DO CANAL, a versão do contrato e o corpo v2", async () => {
@@ -116,9 +132,53 @@ describe("adapter de saída", () => {
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
-  it("resposta que não é 2xx vira erro com o status", async () => {
+  it("resposta que não é 2xx vira erro com o status (depois de esgotar as tentativas)", async () => {
+    vi.useFakeTimers();
     fetchSpy.mockResolvedValue(new Response("{}", { status: 503 }));
-    await expect(chatExternoAdapter.send(envelope())).rejects.toThrow("chat_externo_send_failed_503");
+    await rejeitaDepoisDasEsperas(chatExternoAdapter.send(envelope()), "chat_externo_send_failed_503");
+    expect(fetchSpy).toHaveBeenCalledTimes(3);
+  });
+
+  describe("falha passageira do Chat (ele reiniciando num deploy, por exemplo)", () => {
+    it.each([502, 503, 504])("%i: reenvia com o MESMO corpo e a MESMA assinatura, e entrega", async (status) => {
+      vi.useFakeTimers();
+      fetchSpy
+        .mockResolvedValueOnce(new Response("{}", { status }))
+        .mockResolvedValueOnce(new Response("{}", { status: 200 }));
+
+      const r = await depoisDasEsperas(chatExternoAdapter.send(envelope()));
+
+      expect(r).toEqual({ externalId: "msg-9" });
+      expect(fetchSpy).toHaveBeenCalledTimes(2);
+      const [a, b] = fetchSpy.mock.calls.map((c) => c[1] as RequestInit);
+      // O Chat deduplica por `message_id`; o reenvio só é seguro se for IDÊNTICO ao que pode ter chegado.
+      expect(b!.body).toBe(a!.body);
+      expect((b!.headers as Record<string, string>)[HEADER_ASSINATURA_DE_ENTRADA]).toBe(
+        (a!.headers as Record<string, string>)[HEADER_ASSINATURA_DE_ENTRADA],
+      );
+    });
+
+    it("queda de rede rápida (conexão recusada) também é reenviada", async () => {
+      vi.useFakeTimers();
+      fetchSpy
+        .mockRejectedValueOnce(new TypeError("fetch failed"))
+        .mockResolvedValueOnce(new Response("{}", { status: 200 }));
+
+      expect(await depoisDasEsperas(chatExternoAdapter.send(envelope()))).toEqual({ externalId: "msg-9" });
+      expect(fetchSpy).toHaveBeenCalledTimes(2);
+    });
+
+    it("TIMEOUT não é reenviado: pode ter sido processado, e esperar de novo estouraria o tempo da requisição", async () => {
+      fetchSpy.mockRejectedValue(Object.assign(new Error("timeout"), { name: "TimeoutError" }));
+      await expect(chatExternoAdapter.send(envelope())).rejects.toThrow("timeout");
+      expect(fetchSpy).toHaveBeenCalledTimes(1);
+    });
+
+    it.each([400, 401, 404, 410, 413])("%i é definitivo: NÃO reenvia", async (status) => {
+      fetchSpy.mockResolvedValue(new Response("{}", { status }));
+      await expect(chatExternoAdapter.send(envelope())).rejects.toThrow(`chat_externo_send_failed_${status}`);
+      expect(fetchSpy).toHaveBeenCalledTimes(1);
+    });
   });
 
   it("a saúde reflete a configuração do canal", async () => {
@@ -133,6 +193,111 @@ describe("adapter de saída", () => {
       status: "FAILED",
       detail: "chat_externo_not_configured",
     });
+  });
+});
+
+describe("anexo do atendente (CRM → Chat)", () => {
+  const MIDIA = {
+    url: "https://projeto.supabase.co/storage/v1/object/sign/whatsapp-media/o/c/out-1.jpg?token=t",
+    mime: "image/jpeg",
+    filename: "out-1.jpg",
+    caption: "Segue a foto",
+  };
+  const corpoEnviado = () => JSON.parse((fetchSpy.mock.calls[0] as [string, RequestInit])[1].body as string);
+
+  it("manda o anexo com a URL assinada do Storage, o tipo e o nome, e a legenda vira o texto", async () => {
+    await chatExternoAdapter.send(envelope({ kind: "image", body: undefined, media: MIDIA }));
+
+    expect(corpoEnviado()).toMatchObject({
+      event: "message",
+      message_id: "msg-9",
+      text: "Segue a foto",
+      attachments: [{ kind: "image", url: MIDIA.url, mime: "image/jpeg", name: "out-1.jpg" }],
+    });
+  });
+
+  it("anexo sem legenda: texto vazio (o Chat aceita mensagem só de anexo)", async () => {
+    await chatExternoAdapter.send(
+      envelope({ kind: "document", body: undefined, media: { ...MIDIA, mime: "application/pdf", caption: null } }),
+    );
+    expect(corpoEnviado()).toMatchObject({
+      text: "",
+      attachments: [{ kind: "document", mime: "application/pdf" }],
+    });
+  });
+
+  it("mensagem de texto não leva o campo `attachments`", async () => {
+    await chatExternoAdapter.send(envelope());
+    expect(corpoEnviado()).not.toHaveProperty("attachments");
+  });
+});
+
+describe("anexo do cliente (Chat → CRM): fetchInboundMedia", () => {
+  const URL_DO_ARQUIVO = "https://chat.exemplo.com.br/api/files/abc?exp=9999999999&sig=ff";
+  const baixar = (url = URL_DO_ARQUIVO, hintMime?: string | null) =>
+    chatExternoAdapter.fetchInboundMedia!({ organizationId: "org-1", sessionRef: "principal", url, hintMime });
+  const arquivo = (bytes: number[], tipo: string | null = "image/png") =>
+    new Response(new Uint8Array(bytes), { status: 200, headers: tipo ? { "content-type": tipo } : {} });
+
+  it("baixa do MESMO host do Chat e devolve os bytes com o tipo que o Chat declarou ao servir", async () => {
+    fetchSpy.mockResolvedValue(arquivo([1, 2, 3], "image/png; charset=binary"));
+
+    const media = await baixar();
+
+    expect([...media.buffer]).toEqual([1, 2, 3]);
+    expect(media.mime).toBe("image/png");
+    const [url, init] = fetchSpy.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe(URL_DO_ARQUIVO);
+    // A URL assinada É a credencial: o segredo do canal e a assinatura dos eventos NÃO vão junto, e redirecionar
+    // para outro lugar (que receberia a requisição) é recusado.
+    expect(JSON.stringify(init.headers ?? {})).not.toContain(SEGREDO_DE_SAIDA);
+    expect((init.headers as Record<string, string> | undefined)?.[HEADER_ASSINATURA_DE_ENTRADA]).toBeUndefined();
+    expect(init.redirect).toBe("error");
+  });
+
+  it("sem content-type na resposta usa a dica do webhook; sem nenhum dos dois, octet-stream", async () => {
+    fetchSpy.mockResolvedValueOnce(arquivo([1], null));
+    expect((await baixar(URL_DO_ARQUIVO, "application/pdf")).mime).toBe("application/pdf");
+    fetchSpy.mockResolvedValueOnce(arquivo([1], null));
+    expect((await baixar()).mime).toBe("application/octet-stream");
+  });
+
+  it("URL de OUTRO host é recusada antes de qualquer requisição (o payload não escolhe para onde o servidor vai)", async () => {
+    await expect(baixar("https://evil.example.org/api/files/abc?exp=1&sig=ff")).rejects.toThrow(
+      "chat_externo_media_host_blocked",
+    );
+    await expect(baixar("https://chat.exemplo.com.br.evil.org/x")).rejects.toThrow("chat_externo_media_host_blocked");
+    await expect(baixar("not a url")).rejects.toThrow("chat_externo_media_url_invalid");
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it("host do Chat que resolve para a rede interna é BLOQUEADO (SSRF por DNS)", async () => {
+    destinoResolvido.mockRejectedValue(new Error("unsafe_url:resolved_private_ip"));
+    await expect(baixar()).rejects.toThrow("chat_externo_destination_blocked");
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it("canal incompleto falha com o código do canal (nada some em silêncio)", async () => {
+    linhaDoCanal.mockReturnValue(null);
+    await expect(baixar()).rejects.toThrow("chat_externo_not_configured");
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it.each([403, 404, 410])("%i (link inválido, arquivo apagado, link vencido) falha com o status, para o worker registrar", async (status) => {
+    fetchSpy.mockResolvedValue(new Response("{}", { status }));
+    await expect(baixar()).rejects.toThrow(`chat_externo_media_failed_${status}`);
+  });
+
+  it("arquivo maior que o teto do Chat (10 MB) é recusado, pelo cabeçalho e pelo que de fato chegou", async () => {
+    const GRANDE = 10 * 1024 * 1024 + 1;
+    fetchSpy.mockResolvedValueOnce(
+      new Response(new Uint8Array([1]), { status: 200, headers: { "content-length": String(GRANDE) } }),
+    );
+    await expect(baixar()).rejects.toThrow("chat_externo_media_too_large");
+
+    // cabeçalho que mente (ou ausente): o limite vale também para os bytes lidos
+    fetchSpy.mockResolvedValueOnce(new Response(new Uint8Array(GRANDE), { status: 200 }));
+    await expect(baixar()).rejects.toThrow("chat_externo_media_too_large");
   });
 });
 
@@ -172,8 +337,23 @@ describe("aviso de encerramento (CRM → Chat)", () => {
     await expect(chatExternoAdapter.notificarEncerramento!(entrada)).rejects.toThrow("chat_externo_destination_blocked");
 
     destinoResolvido.mockResolvedValue(undefined);
+    vi.useFakeTimers();
     fetchSpy.mockResolvedValue(new Response("{}", { status: 502 }));
-    await expect(chatExternoAdapter.notificarEncerramento!(entrada)).rejects.toThrow("chat_externo_close_notice_failed_502");
+    await rejeitaDepoisDasEsperas(
+      chatExternoAdapter.notificarEncerramento!(entrada),
+      "chat_externo_close_notice_failed_502",
+    );
+  });
+
+  it("o aviso também reenvia a falha passageira (o Chat trata `conversation.closed` repetido como duplicata)", async () => {
+    vi.useFakeTimers();
+    fetchSpy
+      .mockResolvedValueOnce(new Response("{}", { status: 503 }))
+      .mockResolvedValueOnce(new Response("{}", { status: 200 }));
+
+    await depoisDasEsperas(chatExternoAdapter.notificarEncerramento!(entrada));
+
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
   });
 });
 

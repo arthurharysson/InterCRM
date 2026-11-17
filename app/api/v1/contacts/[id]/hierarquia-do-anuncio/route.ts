@@ -12,6 +12,7 @@
  * `ad_hierarchy_cache` e `ad_insights_connections` têm RLS ligada com zero
  * policies. O mesmo desenho de `crm-summary`.
  */
+import { getUserDaRequisicao } from "@/lib/auth/sessao-da-requisicao";
 import { randomUUID } from "node:crypto";
 import { type NextRequest } from "next/server";
 
@@ -36,7 +37,7 @@ export async function GET(
   const {
     data: { user },
     error: authErr,
-  } = await supabase.auth.getUser();
+  } = await getUserDaRequisicao();
   if (authErr || !user) {
     return fail("unauthenticated", "Auth required.", 401, { requestId });
   }

@@ -44,6 +44,7 @@ import { ok, fail } from "@/lib/api/wrappers";
 import { audit } from "@/lib/audit";
 import { nomeDoContato } from "@/lib/contacts/rotulo-do-contato";
 import { loadAuthUser } from "@/lib/auth/server";
+import { getUserDaRequisicao } from "@/lib/auth/sessao-da-requisicao";
 import { requireRole } from "@/lib/auth/require-role";
 import { traduzir } from "@/lib/i18n/dicionario";
 import { requireSupportWrite } from "@/lib/impersonate/support";
@@ -111,7 +112,7 @@ export async function GET(_req: NextRequest, ctx: RouteCtx): Promise<Response> {
   const {
     data: { user },
     error: authErr,
-  } = await supabase.auth.getUser();
+  } = await getUserDaRequisicao();
   if (authErr || !user) {
     return fail("unauthenticated", "Auth required.", 401, { requestId });
   }

@@ -8,6 +8,7 @@ import { type NextRequest } from "next/server";
 import { ApiError } from "@/lib/api/types";
 import { fail, ok } from "@/lib/api/wrappers";
 import { loadAuthUser } from "@/lib/auth/server";
+import { getUserDaRequisicao } from "@/lib/auth/sessao-da-requisicao";
 import { orgAtivaDaApi } from "@/lib/auth/require-role";
 import { traduzir } from "@/lib/i18n/dicionario";
 import { listMessagesQuerySchema } from "@/lib/schemas";
@@ -29,7 +30,7 @@ export async function GET(req: NextRequest, ctx: RouteCtx): Promise<Response> {
   const {
     data: { user },
     error: authErr,
-  } = await supabase.auth.getUser();
+  } = await getUserDaRequisicao();
   if (authErr || !user) {
     return fail("unauthenticated", "Auth required.", 401, { requestId });
   }

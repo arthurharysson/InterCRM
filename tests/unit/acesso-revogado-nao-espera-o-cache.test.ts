@@ -123,6 +123,7 @@ vi.mock("@/lib/audit", () => ({ audit: vi.fn(async () => undefined) }));
 
 const { esquecerTudo, invalidarUsuario } = await import("@/lib/auth/cache-curto");
 const { loadAuthUser } = await import("@/lib/auth/server");
+const { getUserDaRequisicao } = await import("@/lib/auth/sessao-da-requisicao");
 const { requireRole } = await import("@/lib/auth/require-role");
 
 beforeEach(() => {
@@ -165,6 +166,31 @@ describe("cache curto entre requisições (#3696)", () => {
     await loadAuthUser();
     await loadAuthUser();
     expect(estado.getUsers).toBe(1);
+  });
+
+  it("`getUserDaRequisicao` + `loadAuthUser` na MESMA rota custam UMA ida ao `/auth/v1/user`", async () => {
+    // O padrão das rotas do Inbox: valida a sessão e, logo depois, carrega o
+    // usuário. Com `supabase.auth.getUser()` cru na primeira linha eram DUAS
+    // idas por requisição — a crua nunca passava pelo cache.
+    const resposta = await getUserDaRequisicao();
+    expect(resposta.data.user?.id).toBe(USER_ID);
+    await loadAuthUser();
+    expect(estado.getUsers).toBe(1);
+
+    // E a requisição seguinte, dentro da janela, não vai ao GoTrue de novo.
+    await getUserDaRequisicao();
+    await loadAuthUser();
+    expect(estado.getUsers).toBe(1);
+  });
+
+  it("`getUserDaRequisicao` obedece à invalidação: sair de todos os aparelhos derruba o cache dele", async () => {
+    await getUserDaRequisicao();
+    expect(estado.getUsers).toBe(1);
+
+    invalidarUsuario(USER_ID);
+
+    await getUserDaRequisicao();
+    expect(estado.getUsers).toBe(2);
   });
 
   it("sem cookie de sessão reconhecível o `getUser` não é reaproveitado", async () => {

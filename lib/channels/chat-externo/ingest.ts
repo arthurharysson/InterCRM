@@ -19,8 +19,10 @@
  *    dos eventos seria pior que abrir a conversa sem o histórico.
  *
  *  `chat.closed_by_customer`
- *    registra um aviso de sistema na conversa. NÃO fecha a conversa sozinho: o encerramento tem regras próprias
- *    (motivo, caso, avaliação) que ainda não foram ligadas a este canal — ver o plano, CRM-7.
+ *    registra um aviso de sistema na conversa E a fecha (`fn_service_status`, a mesma RPC do botão "Encerrar"):
+ *    o cliente foi embora, e a conversa não pode ficar aberta numa Fila que ninguém vai responder. Cada passo é
+ *    idempotente, e falha do banco no fechamento lança para o Chat reenviar. A demanda NÃO é fechada junto: a RPC
+ *    deixa o "próximo passo" de revisar o atendimento, como em qualquer fechamento.
  *
  * ═══ POR QUE UM CONTATO POR CHAT, E O QUE O CPF FAZ ═════════════════════════════════════════════
  *
@@ -32,13 +34,15 @@
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { audit } from "@/lib/audit";
 import { camposCpfParaGravar, hashCpf } from "@/lib/contacts/cpf";
 import { moduloLigado } from "@/lib/instalacao/modulos";
 import { marcarConversaComMensagem } from "@/lib/channels/marcar-conversa";
+import { previaDaMensagem } from "@/lib/messaging/previa-da-mensagem";
 import { aplicarEfeitosPosEntrada } from "@/lib/channels/pos-entrada";
 import { logger } from "@/lib/logger";
 
-import type { EventoDoChat, MensagemDoHistorico } from "./contrato";
+import type { AnexoDoChat, EventoDoChat, MensagemDoHistorico } from "./contrato";
 
 export interface ResultadoDoChat {
   status: "ingested" | "duplicate" | "ignored";
@@ -311,6 +315,21 @@ async function gravarDoHistorico(
 
 // ─── message ─────────────────────────────────────────────────────────────────────────────────────
 
+/**
+ * A mensagem do cliente, com ou sem anexos.
+ *
+ * O CRM guarda UMA mídia por linha de `messages`, então uma mensagem com N anexos vira N linhas: o texto (legenda)
+ * vai na PRIMEIRA, com o `message_id` do Chat como `external_id` (compatível com o que já existe), e cada anexo
+ * seguinte ganha `<message_id>:anexo<N>`. Cada linha é idempotente pelo `23505`, então o reenvio do Chat completa
+ * o que faltou sem duplicar o que já entrou — e, como o Chat repete até receber 2xx, falha do banco numa linha LANÇA.
+ *
+ * Os efeitos de sempre (carimbo da conversa, alerta, agente, opt-out) disparam UMA vez por mensagem do cliente, logo
+ * depois da PRIMEIRA linha e só quando ela é nova: reenvio e anexos extras não repetem nada.
+ *
+ * Os BYTES não são baixados aqui: a URL do Chat é assinada e vence em 1 h, e a linha já nasce visível. Quem baixa
+ * e guarda no Storage é o worker de mídia (`media.persist_requested`), com tentativas, pelo `fetchInboundMedia` do
+ * adapter — o mesmo caminho dos outros canais, que também deriva a descrição para a IA.
+ */
 async function receberMensagem(
   admin: SupabaseClient,
   entrada: Entrada,
@@ -330,33 +349,40 @@ async function receberMensagem(
     conversa = { id, contact_id: contactId };
   }
 
-  const { data, error } = await admin
-    .from("messages")
-    .insert({
-      organization_id: entrada.organizationId,
-      conversation_id: conversa.id,
-      contact_id: conversa.contact_id,
-      channel_session_id: entrada.channelSessionId,
-      external_id: ev.message_id,
-      direction: "inbound",
-      sent_via: "external_device",
-      status: "delivered",
-      type: "text",
-      body: ev.text,
-      metadata: { source: FONTE },
-      ...(ev.sent_at ? { sent_at: ev.sent_at } : {}),
-    })
-    .select("id")
-    .maybeSingle();
-  if (error?.code === "23505") return { status: "duplicate", conversationId: conversa.id };
-  if (error || !data) throw new Error(`chat_externo_ingest_insert_failed: ${error?.message ?? "sem id"}`);
-  const messageId = (data as { id: string }).id;
+  const linhas = linhasDaMensagem(ev);
+  let primeiraId: string | undefined;
+  let algumaNova = false;
+  for (const [indice, linha] of linhas.entries()) {
+    const id = await gravarLinhaDaMensagem(admin, entrada, conversa, ev, linha);
+    if (id === "duplicate") continue;
+    algumaNova = true;
+    if (linha.anexo) await pedirPersistenciaDaMidia(admin, entrada.organizationId, conversa.id, id);
+    if (indice === 0) {
+      primeiraId = id;
+      // Os efeitos disparam AQUI, logo depois da primeira linha — e não no fim do laço: se a falha vier no
+      // segundo anexo, a primeira já está gravada e, no reenvio, vira duplicata. Deixar os efeitos para o fim
+      // faria uma mensagem que já está na Fila nunca acordar o alerta nem o agente.
+      await acordarOSistema(admin, entrada, conversa, ev, linhas[0]!, id);
+    }
+  }
+  if (!algumaNova) return { status: "duplicate", conversationId: conversa.id };
+  return { status: "ingested", conversationId: conversa.id, ...(primeiraId ? { messageId: primeiraId } : {}) };
+}
 
+/** Carimbo da conversa + alerta, agente e opt-out: os efeitos de uma mensagem NOVA do cliente. */
+async function acordarOSistema(
+  admin: SupabaseClient,
+  entrada: Entrada,
+  conversa: { id: string; contact_id: string },
+  ev: Extract<EventoDoChat, { event: "message" }>,
+  primeira: LinhaDaMensagem,
+  messageId: string,
+): Promise<void> {
   await marcarConversaComMensagem(admin, {
     organizationId: entrada.organizationId,
     conversationId: conversa.id,
     direction: "inbound",
-    preview: ev.text.slice(0, 200),
+    preview: previaDaMensagem(primeira.corpo, primeira.tipo).slice(0, 200),
     at: ev.sent_at ?? new Date().toISOString(),
     canal: CANAL_DA_CONVERSA,
   });
@@ -377,12 +403,108 @@ async function receberMensagem(
     // bloqueado ao digitar "#sair"). O agente continua escalando ao humano diante de um pedido provável.
     optOutPorPalavra: false,
   });
+}
 
-  return { status: "ingested", conversationId: conversa.id, messageId };
+type LinhaDaMensagem = {
+  externalId: string | null;
+  tipo: "text" | "image" | "document";
+  corpo: string;
+  anexo: AnexoDoChat | null;
+};
+
+/** As linhas de `messages` desta mensagem do cliente: o texto + o 1º anexo, e uma linha por anexo seguinte. */
+function linhasDaMensagem(ev: Extract<EventoDoChat, { event: "message" }>): LinhaDaMensagem[] {
+  if (ev.attachments.length === 0) return [{ externalId: ev.message_id, tipo: "text", corpo: ev.text, anexo: null }];
+  return ev.attachments.map((anexo, i) => ({
+    externalId: i === 0 ? ev.message_id : ev.message_id ? `${ev.message_id}:anexo${i + 1}` : null,
+    tipo: anexo.kind,
+    corpo: i === 0 ? ev.text : "",
+    anexo,
+  }));
+}
+
+/** O id da linha nova, ou `"duplicate"` quando o `23505` diz que o reenvio já a trouxe. Outro erro LANÇA. */
+async function gravarLinhaDaMensagem(
+  admin: SupabaseClient,
+  entrada: Entrada,
+  conversa: { id: string; contact_id: string },
+  ev: Extract<EventoDoChat, { event: "message" }>,
+  linha: LinhaDaMensagem,
+): Promise<string | "duplicate"> {
+  const { data, error } = await admin
+    .from("messages")
+    .insert({
+      organization_id: entrada.organizationId,
+      conversation_id: conversa.id,
+      contact_id: conversa.contact_id,
+      channel_session_id: entrada.channelSessionId,
+      external_id: linha.externalId,
+      direction: "inbound",
+      sent_via: "external_device",
+      status: "delivered",
+      type: linha.tipo,
+      body: linha.corpo,
+      // A URL é PONTEIRO para algo que vence (1 h) e só o Chat serve: o worker baixa os bytes e guarda uma cópia
+      // no Storage. O mime é dica — o que vale é o do arquivo baixado.
+      ...(linha.anexo ? { media_url: linha.anexo.url, media_mime: linha.anexo.mime } : {}),
+      metadata: {
+        source: FONTE,
+        // O nome original: é a chave que o cartão de documento do Inbox lê.
+        ...(linha.anexo?.name ? { media_filename: linha.anexo.name } : {}),
+      },
+      ...(ev.sent_at ? { sent_at: ev.sent_at } : {}),
+    })
+    .select("id")
+    .maybeSingle();
+  if (error?.code === "23505") return "duplicate";
+  if (error || !data) throw new Error(`chat_externo_ingest_insert_failed: ${error?.message ?? "sem id"}`);
+  return (data as { id: string }).id;
+}
+
+/**
+ * Pede ao worker de mídia que baixe e guarde o anexo (mesmo evento e mesmo payload dos outros canais).
+ * Best-effort: a mensagem já está gravada e visível; derrubar a ingestão aqui faria o Chat reenviar tudo.
+ */
+async function pedirPersistenciaDaMidia(
+  admin: SupabaseClient,
+  organizationId: string,
+  conversationId: string,
+  messageId: string,
+): Promise<void> {
+  const { error } = await admin.rpc(
+    "emit_event" as never,
+    {
+      p_event_type: "media.persist_requested",
+      p_entity_kind: "message",
+      p_entity_id: messageId,
+      p_payload: { message_id: messageId, conversation_id: conversationId },
+      p_metadata: { source: "chat_externo_webhook" },
+      p_organization_id: organizationId,
+    } as never,
+  );
+  if (error) {
+    logger.warn("[chat-externo] emit media.persist_requested falhou", { messageId, detail: error.message });
+  }
 }
 
 // ─── chat.closed_by_customer ─────────────────────────────────────────────────────────────────────
 
+/**
+ * O cliente encerrou pelo botão da página: o aviso de sistema entra na linha do tempo E a conversa SAI DA FILA.
+ *
+ * Os dois passos são independentes e cada um é idempotente, para o reenvio do Chat (que repete até receber 2xx)
+ * completar o que faltou:
+ *   - o aviso: `external_id` determinístico, o `23505` do reenvio é o sinal de "já gravei";
+ *   - o fechamento: pela `fn_service_status` — a MESMA do botão "Encerrar" do atendente —, que devolve a linha sem
+ *     mexer quando a conversa já está no estado pedido. Conversa que a equipe já fechou (ou resolveu/arquivou) nem
+ *     chega a chamá-la, e não audita duas vezes.
+ *
+ * Falha do banco no fechamento LANÇA, de propósito: a rota responde 5xx e o Chat reenvia (a outbox dele repete por
+ * até 24 h). Engolir o erro deixaria a conversa aberta para sempre numa Fila cujo cliente já foi embora.
+ *
+ * NÃO avisa o Chat de volta (`avisarEncerramentoAoCanal`): foi ele quem encerrou, a página já está fechada, e um
+ * `conversation.closed` de volta só voltaria como 410/duplicata.
+ */
 async function avisarEncerramento(
   admin: SupabaseClient,
   entrada: Entrada,
@@ -391,6 +513,18 @@ async function avisarEncerramento(
   const conversa = await conversaDaIdentidade(admin, entrada, ev.identity);
   if (!conversa) return { status: "ignored", reason: "conversa_desconhecida" };
 
+  const avisou = await gravarAvisoDeEncerramento(admin, entrada, conversa, ev);
+  const fechou = await fecharConversaDoCliente(admin, entrada, conversa.id);
+  return { status: avisou || fechou ? "ingested" : "duplicate", conversationId: conversa.id };
+}
+
+/** `true` quando gravou o aviso agora; `false` quando ele já existia (reenvio do Chat). */
+async function gravarAvisoDeEncerramento(
+  admin: SupabaseClient,
+  entrada: Entrada,
+  conversa: { id: string; contact_id: string },
+  ev: Extract<EventoDoChat, { event: "chat.closed_by_customer" }>,
+): Promise<boolean> {
   const { error } = await admin.from("messages").insert({
     organization_id: entrada.organizationId,
     conversation_id: conversa.id,
@@ -406,9 +540,55 @@ async function avisarEncerramento(
     metadata: { source: FONTE, aviso_de_sistema: "encerrado_pelo_cliente" },
     ...(ev.closed_at ? { sent_at: ev.closed_at } : {}),
   });
-  if (error?.code === "23505") return { status: "duplicate", conversationId: conversa.id };
+  if (error?.code === "23505") return false;
   if (error) throw new Error(`chat_externo_closed_notice_failed: ${error.message}`);
-  return { status: "ingested", conversationId: conversa.id };
+  return true;
+}
+
+/** Estados de fim de atendimento: a equipe já decidiu, e o cliente ter saído depois não muda nada. */
+const ESTADOS_TERMINAIS = new Set(["closed", "resolved", "archived"]);
+
+/** `true` quando ESTA chamada fechou a conversa; `false` quando ela já não estava mais aberta. */
+async function fecharConversaDoCliente(
+  admin: SupabaseClient,
+  entrada: Entrada,
+  conversationId: string,
+): Promise<boolean> {
+  const { data, error } = await admin
+    .from("conversations")
+    .select("status")
+    .eq("organization_id", entrada.organizationId)
+    .eq("id", conversationId)
+    .maybeSingle();
+  if (error) throw new Error("chat_externo_close_lookup_failed");
+  const status = (data as { status: string } | null)?.status;
+  if (!status || ESTADOS_TERMINAIS.has(status)) return false;
+
+  const { error: erroFechar } = await admin.rpc("fn_service_status", {
+    p_org: entrada.organizationId,
+    p_conversation: conversationId,
+    p_status: "closed",
+  });
+  // `P0002` = a conversa sumiu entre a leitura e a escrita: nada a fechar, não é erro do Chat.
+  if (erroFechar?.code === "P0002") return false;
+  if (erroFechar) {
+    logger.error("[chat-externo] fn_service_status falhou ao fechar", {
+      organization_id: entrada.organizationId,
+      code: erroFechar.code,
+    });
+    throw new Error(`chat_externo_close_failed: ${erroFechar.code}`);
+  }
+
+  // Sem ator humano: quem encerrou foi o cliente, pelo chat. Fire-and-forget, como todo `audit`.
+  void audit({
+    action: "conversation.closed",
+    organizationId: entrada.organizationId,
+    resourceType: "conversation",
+    resourceId: conversationId,
+    requestId: entrada.requestId,
+    metadata: { via: "chat_externo", encerrado_por: "cliente" },
+  });
+  return true;
 }
 
 // ─── compartilhado ───────────────────────────────────────────────────────────────────────────────

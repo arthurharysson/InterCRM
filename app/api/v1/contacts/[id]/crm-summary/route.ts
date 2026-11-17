@@ -26,6 +26,7 @@
  * alternativa (status por seção) triplicaria os estados no componente, e a
  * doença que esta rota cura é exatamente estados distintos colapsados num só.
  */
+import { getUserDaRequisicao } from "@/lib/auth/sessao-da-requisicao";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { lerAnuncioDaMensagem, lerAnuncioDoContato, mesmoAnuncio } from "@/lib/leads/atribuicao-de-anuncio";
 import { prospectEnrichmentSchema } from "@/lib/prospecting/schema";
@@ -91,7 +92,7 @@ export async function GET(
   const {
     data: { user },
     error: authErr,
-  } = await supabase.auth.getUser();
+  } = await getUserDaRequisicao();
   if (authErr || !user) {
     return fail("unauthenticated", "Auth required.", 401, { requestId });
   }

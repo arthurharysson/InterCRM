@@ -22,13 +22,30 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 
 import { normalizeCpf } from "@/lib/contacts/cpf";
+import { nomeDeArquivoLimpo } from "@/lib/messaging/media/nome-de-arquivo";
 
 /** A identidade opaca do chat. O Chat gera `web:<uuid>`; o CRM só a trata como chave. */
 export const PREFIXO_DA_IDENTIDADE = "web:";
 export const TAMANHO_MAXIMO_DA_IDENTIDADE = 64;
 export const TAMANHO_MAXIMO_DO_TEXTO = 8_000;
 export const MAXIMO_DE_MENSAGENS_NO_HISTORICO = 200;
+/** O Chat limita a 5 por mensagem; o CRM aceita até 10 (folga) e ignora o que passar. */
+export const MAXIMO_DE_ANEXOS_POR_MENSAGEM = 10;
+const TAMANHO_MAXIMO_DA_URL_DO_ANEXO = 2048;
 const TAMANHO_MAXIMO_DO_ID_DE_MENSAGEM = 128;
+
+/**
+ * Um anexo do cliente, como o Chat o descreve: uma URL ASSINADA e com validade (1 h) que o CRM baixa e guarda no
+ * Storage dele — o link do Chat não pode ser a fonte da verdade. `kind` é só rótulo (`image` ou `document`): o tipo
+ * de verdade é o do arquivo, que o download confere.
+ */
+export interface AnexoDoChat {
+  kind: "image" | "document";
+  url: string;
+  mime: string | null;
+  size: number | null;
+  name: string | null;
+}
 
 export interface MensagemDoHistorico {
   /** Id da mensagem no BOT. Só é único dentro do bot: o CRM o prefixa com a identidade ao gravar. */
@@ -62,6 +79,8 @@ export type EventoDoChat =
       text: string;
       sent_at: string | null;
       sender_name: string | null;
+      /** Vazio quando a mensagem é só texto. A mensagem pode ter texto vazio E anexos. */
+      attachments: AnexoDoChat[];
     }
   | {
       event: "chat.closed_by_customer";
@@ -128,6 +147,33 @@ function lerHistorico(valor: unknown): { itens: MensagemDoHistorico[]; invalido:
   return { itens, invalido: false };
 }
 
+/**
+ * Os anexos de uma `message`. Tudo aqui é opcional: o que não for lista vira "sem anexo", e item sem URL web
+ * utilizável é DESCARTADO sem derrubar a mensagem — perder o texto do cliente por causa de um anexo ruim seria pior
+ * que perder o anexo. Esquema que não é http(s) (`javascript:`, `file:`) nem entra: a URL é de fora e vai virar
+ * requisição do servidor; quem a confere de verdade (mesmo host do Chat, anti-SSRF) é o download.
+ */
+function lerAnexos(valor: unknown): AnexoDoChat[] {
+  if (!Array.isArray(valor)) return [];
+  const itens: AnexoDoChat[] = [];
+  for (const bruto of valor.slice(0, MAXIMO_DE_ANEXOS_POR_MENSAGEM)) {
+    const a = objeto(bruto);
+    const url = a ? texto(a.url, TAMANHO_MAXIMO_DA_URL_DO_ANEXO) : null;
+    if (!a || !url || !/^https?:\/\//i.test(url)) continue;
+    const mime = texto(a.mime, 128)?.split(";")[0]?.trim().toLowerCase() || null;
+    const tamanho = typeof a.size === "number" && Number.isFinite(a.size) && a.size >= 0 ? Math.floor(a.size) : null;
+    const ehImagem = a.kind === "image" || (mime?.startsWith("image/") ?? false);
+    itens.push({
+      kind: ehImagem ? "image" : "document",
+      url,
+      mime,
+      size: tamanho,
+      name: nomeDeArquivoLimpo(a.name),
+    });
+  }
+  return itens;
+}
+
 /** Lê o corpo cru de um webhook do Chat. Não lança: devolve o desfecho. */
 export function lerEventoDoChat(rawBody: string): LeituraDoEvento {
   let bruto: unknown;
@@ -155,6 +201,7 @@ export function lerEventoDoChat(rawBody: string): LeituraDoEvento {
         text: corpo,
         sent_at: dataIso(o.sent_at),
         sender_name: texto(o.sender_name, 120) ?? texto(o.display_name, 120),
+        attachments: lerAnexos(o.attachments),
       },
     };
   }

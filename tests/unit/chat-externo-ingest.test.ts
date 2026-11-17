@@ -12,6 +12,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const moduloLigado = vi.fn();
 const aplicarEfeitosPosEntrada = vi.fn();
+const audit = vi.fn();
+vi.mock("@/lib/audit", () => ({ audit: (...a: unknown[]) => audit(...a) }));
 vi.mock("@/lib/instalacao/modulos", () => ({ moduloLigado: (...a: unknown[]) => moduloLigado(...a) }));
 vi.mock("@/lib/channels/pos-entrada", () => ({
   aplicarEfeitosPosEntrada: (...a: unknown[]) => aplicarEfeitosPosEntrada(...a),
@@ -38,6 +40,12 @@ function bancoEmMemoria(semente: { attendant_sectors?: Linha[] } = {}) {
   };
   const tabela_ = (nome: string): Linha[] => (t as unknown as Record<string, Linha[]>)[nome] ?? [];
   const rpcs: Array<{ nome: string; args: Record<string, unknown> }> = [];
+  /** Liga uma falha de banco no fechamento (`fn_service_status`), para provar que o Chat vai reenviar. */
+  const falhas = {
+    fechamento: null as null | { code: string; message: string },
+    /** Falha o INSERT de uma mensagem que casar (ex.: só o segundo anexo), para provar a recuperação no reenvio. */
+    mensagem: null as null | ((linha: Linha) => null | { code: string; message: string }),
+  };
   let n = 0;
   const novoId = () => `id-${++n}`;
 
@@ -70,6 +78,8 @@ function bancoEmMemoria(semente: { attendant_sectors?: Linha[] } = {}) {
 
     async function executar(unica: boolean) {
       if (acao === "insert") {
+        const falha = tabela === "messages" ? falhas.mensagem?.(carga) : null;
+        if (falha) return { data: null, error: falha };
         if (violaUnico(tabela, carga)) return { data: null, error: { code: "23505", message: "duplicate key" } };
         const linha = { id: novoId(), ...carga };
         tabela_(tabela).push(linha);
@@ -132,10 +142,19 @@ function bancoEmMemoria(semente: { attendant_sectors?: Linha[] } = {}) {
       }
       return { data: conversa.id, error: null };
     }
+    // O mesmo contrato da RPC de verdade: idempotente (já está no estado pedido → devolve a linha),
+    // `P0002` quando a conversa não existe.
+    if (nome === "fn_service_status") {
+      if (falhas.fechamento) return { data: null, error: falhas.fechamento };
+      const conversa = t.conversations.find((c) => c.id === args.p_conversation && c.organization_id === args.p_org);
+      if (!conversa) return { data: null, error: { code: "P0002", message: "service_not_found" } };
+      conversa.status = args.p_status;
+      return { data: conversa, error: null };
+    }
     return { data: null, error: null };
   }
 
-  return { admin: { from, rpc } as never, t, rpcs };
+  return { admin: { from, rpc } as never, t, rpcs, falhas };
 }
 
 function evento(corpo: Record<string, unknown>): EventoDoChat {
@@ -161,6 +180,7 @@ const INICIO = {
 beforeEach(() => {
   moduloLigado.mockReset().mockResolvedValue(true);
   aplicarEfeitosPosEntrada.mockReset().mockResolvedValue(undefined);
+  audit.mockReset().mockResolvedValue(undefined);
 });
 
 describe("chat.started", () => {
@@ -315,6 +335,112 @@ describe("message", () => {
   });
 });
 
+describe("message com anexos", () => {
+  const URL_1 = "https://chat.exemplo.com.br/api/files/a1?exp=9&sig=aa";
+  const URL_2 = "https://chat.exemplo.com.br/api/files/a2?exp=9&sig=bb";
+  const FOTO = { kind: "image", url: URL_1, mime: "image/jpeg", size: 1234, name: "foto.jpg" };
+  const PDF = { kind: "document", url: URL_2, mime: "application/pdf", size: 99, name: "contrato.pdf" };
+  const msg = (extra: Record<string, unknown>) =>
+    evento({ event: "message", identity: ID_1, message_id: "m1", sent_at: "2026-11-13T14:01:00Z", ...extra });
+  const pedidosDeMidia = (rpcs: Array<{ nome: string; args: Record<string, unknown> }>) =>
+    rpcs.filter((x) => x.nome === "emit_event" && x.args.p_event_type === "media.persist_requested");
+
+  it("só a foto (texto vazio): UMA linha de imagem com a URL de download, o nome e o pedido de persistência", async () => {
+    const { admin, t, rpcs } = bancoEmMemoria();
+    const r = await ingerirEventoDoChat(admin, { ...entrada, evento: msg({ text: "", attachments: [FOTO] }) });
+
+    expect(r.status).toBe("ingested");
+    expect(t.messages).toHaveLength(1);
+    expect(t.messages[0]).toMatchObject({
+      external_id: "m1",
+      direction: "inbound",
+      type: "image",
+      body: "",
+      media_url: URL_1,
+      media_mime: "image/jpeg",
+      metadata: { source: "chat_externo", media_filename: "foto.jpg" },
+    });
+    // quem baixa e guarda os bytes é o worker de mídia (com tentativas), não a ingestão
+    const pedidos = pedidosDeMidia(rpcs);
+    expect(pedidos).toHaveLength(1);
+    expect(pedidos[0]!.args).toMatchObject({
+      p_entity_id: t.messages[0]!.id,
+      p_organization_id: ORG,
+      p_payload: { message_id: t.messages[0]!.id, conversation_id: t.conversations[0]!.id },
+    });
+    // a prévia da Fila diz "Imagem", não fica vazia
+    const marca = rpcs.find((x) => x.nome === "fn_mark_conversation_message")!;
+    expect(marca.args.p_preview).toBe("Imagem");
+    expect(aplicarEfeitosPosEntrada).toHaveBeenCalledTimes(1);
+  });
+
+  it("texto + foto + PDF: o texto vai na PRIMEIRA linha, cada anexo vira uma linha, e os efeitos disparam UMA vez", async () => {
+    const { admin, t, rpcs } = bancoEmMemoria();
+    await ingerirEventoDoChat(admin, { ...entrada, evento: msg({ text: "Segue a foto e o contrato", attachments: [FOTO, PDF] }) });
+
+    expect(t.messages.map((m) => [m.external_id, m.type, m.body, m.media_url])).toEqual([
+      ["m1", "image", "Segue a foto e o contrato", URL_1],
+      ["m1:anexo2", "document", "", URL_2],
+    ]);
+    expect(t.messages[1]).toMatchObject({ media_mime: "application/pdf", metadata: { media_filename: "contrato.pdf" } });
+    expect(pedidosDeMidia(rpcs)).toHaveLength(2);
+    expect(aplicarEfeitosPosEntrada).toHaveBeenCalledTimes(1);
+    expect(rpcs.find((x) => x.nome === "fn_mark_conversation_message")!.args.p_preview).toBe("Segue a foto e o contrato");
+  });
+
+  it("reenviar o MESMO evento é duplicata: não repete linha, pedido de mídia nem efeito", async () => {
+    const { admin, t, rpcs } = bancoEmMemoria();
+    const e = msg({ text: "oi", attachments: [FOTO, PDF] });
+    await ingerirEventoDoChat(admin, { ...entrada, evento: e });
+    aplicarEfeitosPosEntrada.mockClear();
+
+    const r = await ingerirEventoDoChat(admin, { ...entrada, evento: e });
+
+    expect(r.status).toBe("duplicate");
+    expect(t.messages).toHaveLength(2);
+    expect(pedidosDeMidia(rpcs)).toHaveLength(2);
+    expect(aplicarEfeitosPosEntrada).not.toHaveBeenCalled();
+  });
+
+  it("o banco falha só no SEGUNDO anexo: lança (o Chat reenvia) e o reenvio grava o que faltou sem duplicar nem repetir efeito", async () => {
+    const { admin, t, rpcs, falhas } = bancoEmMemoria();
+    const e = msg({ text: "oi", attachments: [FOTO, PDF] });
+
+    falhas.mensagem = (linha) => (linha.external_id === "m1:anexo2" ? { code: "XX000", message: "boom" } : null);
+    await expect(ingerirEventoDoChat(admin, { ...entrada, evento: e })).rejects.toThrow(/chat_externo_ingest_insert_failed/);
+    expect(t.messages.map((m) => m.external_id)).toEqual(["m1"]);
+    expect(aplicarEfeitosPosEntrada).toHaveBeenCalledTimes(1);
+
+    falhas.mensagem = null;
+    const r = await ingerirEventoDoChat(admin, { ...entrada, evento: e });
+    expect(r.status).toBe("ingested");
+    expect(t.messages.map((m) => m.external_id)).toEqual(["m1", "m1:anexo2"]);
+    expect(pedidosDeMidia(rpcs)).toHaveLength(2);
+    expect(aplicarEfeitosPosEntrada).toHaveBeenCalledTimes(1);
+  });
+
+  it("falha ao pedir a persistência NÃO derruba a ingestão (a mensagem já está gravada e visível)", async () => {
+    const { admin, t } = bancoEmMemoria();
+    const original = (admin as unknown as { rpc: (n: string, a: Record<string, unknown>) => Promise<unknown> }).rpc;
+    (admin as unknown as { rpc: unknown }).rpc = async (n: string, a: Record<string, unknown>) =>
+      n === "emit_event" ? { data: null, error: { code: "XX000", message: "fila fora" } } : original(n, a);
+
+    const r = await ingerirEventoDoChat(admin, { ...entrada, evento: msg({ text: "", attachments: [FOTO] }) });
+
+    expect(r.status).toBe("ingested");
+    expect(t.messages).toHaveLength(1);
+  });
+
+  it("mensagem só de texto segue como sempre: sem media_url e sem pedido de persistência", async () => {
+    const { admin, t, rpcs } = bancoEmMemoria();
+    await ingerirEventoDoChat(admin, { ...entrada, evento: msg({ text: "só texto" }) });
+
+    expect(t.messages[0]).toMatchObject({ type: "text", body: "só texto" });
+    expect(t.messages[0]).not.toHaveProperty("media_url");
+    expect(pedidosDeMidia(rpcs)).toHaveLength(0);
+  });
+});
+
 describe("chat.closed_by_customer", () => {
   it("conversa que o CRM não conhece: ignorado, sem criar nada", async () => {
     const { admin, t } = bancoEmMemoria();
@@ -326,8 +452,8 @@ describe("chat.closed_by_customer", () => {
     expect(t.conversations).toHaveLength(0);
   });
 
-  it("registra UM aviso de sistema e NÃO fecha a conversa; o reenvio vira duplicata", async () => {
-    const { admin, t } = bancoEmMemoria();
+  it("registra UM aviso de sistema e FECHA a conversa; o reenvio vira duplicata", async () => {
+    const { admin, t, rpcs } = bancoEmMemoria();
     await ingerirEventoDoChat(admin, { ...entrada, evento: evento({ ...INICIO, sector: undefined, history: [] }) });
     const fim = evento({ event: "chat.closed_by_customer", identity: ID_1 });
 
@@ -339,8 +465,71 @@ describe("chat.closed_by_customer", () => {
     const avisos = t.messages.filter((m) => (m.metadata as Linha)?.aviso_de_sistema === "encerrado_pelo_cliente");
     expect(avisos).toHaveLength(1);
     expect(avisos[0]!).toMatchObject({ sent_via: "system", direction: "outbound" });
-    // o encerramento tem regras próprias (motivo, caso, avaliação) que ainda não foram ligadas a este canal
+    // O cliente encerrou: a conversa sai da Fila pelo MESMO caminho do botão "Encerrar" do atendente
+    // (`fn_service_status`), e não por um UPDATE solto que pularia as regras do atendimento.
+    expect(t.conversations[0]!.status).toBe("closed");
+    const fechamentos = rpcs.filter((x) => x.nome === "fn_service_status");
+    expect(fechamentos).toHaveLength(1);
+    expect(fechamentos[0]!.args).toMatchObject({ p_org: ORG, p_conversation: t.conversations[0]!.id, p_status: "closed" });
+  });
+
+  it("audita o fechamento UMA vez, sem ator humano, dizendo que veio do cliente pelo chat", async () => {
+    const { admin, t } = bancoEmMemoria();
+    await ingerirEventoDoChat(admin, { ...entrada, evento: evento({ ...INICIO, sector: undefined, history: [] }) });
+    const fim = evento({ event: "chat.closed_by_customer", identity: ID_1 });
+
+    await ingerirEventoDoChat(admin, { ...entrada, evento: fim, requestId: "req-1" });
+    await ingerirEventoDoChat(admin, { ...entrada, evento: fim, requestId: "req-2" });
+
+    expect(audit).toHaveBeenCalledTimes(1);
+    expect(audit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: "conversation.closed",
+        organizationId: ORG,
+        resourceType: "conversation",
+        resourceId: t.conversations[0]!.id,
+        requestId: "req-1",
+        metadata: expect.objectContaining({ via: "chat_externo", encerrado_por: "cliente" }),
+      }),
+    );
+    expect((audit.mock.calls[0]![0] as { actorUserId?: unknown }).actorUserId ?? null).toBeNull();
+  });
+
+  it("conversa que a equipe JÁ fechou: não chama a RPC nem audita de novo", async () => {
+    const { admin, t, rpcs } = bancoEmMemoria();
+    await ingerirEventoDoChat(admin, { ...entrada, evento: evento({ ...INICIO, sector: undefined, history: [] }) });
+    t.conversations[0]!.status = "resolved";
+
+    const r = await ingerirEventoDoChat(admin, {
+      ...entrada,
+      evento: evento({ event: "chat.closed_by_customer", identity: ID_1 }),
+    });
+
+    // o aviso de sistema ainda é gravado (o cliente encerrou, e a linha do tempo diz isso)
+    expect(r.status).toBe("ingested");
+    expect(rpcs.some((x) => x.nome === "fn_service_status")).toBe(false);
+    expect(audit).not.toHaveBeenCalled();
+    expect(t.conversations[0]!.status).toBe("resolved");
+  });
+
+  it("o banco falha ao fechar: a ingestão LANÇA (o Chat reenvia) e o reenvio fecha sem duplicar o aviso", async () => {
+    const { admin, t, falhas } = bancoEmMemoria();
+    await ingerirEventoDoChat(admin, { ...entrada, evento: evento({ ...INICIO, sector: undefined, history: [] }) });
+    const fim = evento({ event: "chat.closed_by_customer", identity: ID_1 });
+
+    falhas.fechamento = { code: "XX000", message: "boom" };
+    await expect(ingerirEventoDoChat(admin, { ...entrada, evento: fim })).rejects.toThrow(/chat_externo_close_failed/);
     expect(t.conversations[0]!.status).toBe("open");
+    expect(audit).not.toHaveBeenCalled();
+
+    // O Chat reenvia (5xx → retentativa): o aviso já existe, e o fechamento que faltava acontece agora.
+    falhas.fechamento = null;
+    const r = await ingerirEventoDoChat(admin, { ...entrada, evento: fim });
+    expect(r.status).toBe("ingested");
+    expect(t.conversations[0]!.status).toBe("closed");
+    const avisos = t.messages.filter((m) => (m.metadata as Linha)?.aviso_de_sistema === "encerrado_pelo_cliente");
+    expect(avisos).toHaveLength(1);
+    expect(audit).toHaveBeenCalledTimes(1);
   });
 });
 
