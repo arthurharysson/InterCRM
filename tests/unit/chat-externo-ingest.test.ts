@@ -13,6 +13,15 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const moduloLigado = vi.fn();
 const aplicarEfeitosPosEntrada = vi.fn();
 const audit = vi.fn();
+// `after` do Next: só existe dentro de uma requisição. Fora dela LANÇA (como o de verdade) e a ingestão roda os
+// efeitos na hora; com `requisicao.ativa` ele guarda a tarefa, e o teste decide quando ela roda.
+const requisicao = vi.hoisted(() => ({ ativa: false, agendadas: [] as Array<() => unknown> }));
+vi.mock("next/server", () => ({
+  after: (tarefa: () => unknown) => {
+    if (!requisicao.ativa) throw new Error("`after` was called outside a request scope");
+    requisicao.agendadas.push(tarefa);
+  },
+}));
 vi.mock("@/lib/audit", () => ({ audit: (...a: unknown[]) => audit(...a) }));
 vi.mock("@/lib/instalacao/modulos", () => ({ moduloLigado: (...a: unknown[]) => moduloLigado(...a) }));
 vi.mock("@/lib/channels/pos-entrada", () => ({
@@ -21,6 +30,7 @@ vi.mock("@/lib/channels/pos-entrada", () => ({
 
 import { lerEventoDoChat, type EventoDoChat } from "@/lib/channels/chat-externo/contrato";
 import { ingerirEventoDoChat } from "@/lib/channels/chat-externo/ingest";
+import { logger } from "@/lib/logger";
 
 type Linha = Record<string, unknown>;
 
@@ -178,6 +188,8 @@ const INICIO = {
 };
 
 beforeEach(() => {
+  requisicao.ativa = false;
+  requisicao.agendadas.length = 0;
   moduloLigado.mockReset().mockResolvedValue(true);
   aplicarEfeitosPosEntrada.mockReset().mockResolvedValue(undefined);
   audit.mockReset().mockResolvedValue(undefined);
@@ -332,6 +344,96 @@ describe("message", () => {
     expect(r.status).toBe("ingested");
     expect(t.conversations).toHaveLength(1);
     expect(t.contacts[0]!).toMatchObject({ social_identity: ID_1, name: "Maria" });
+  });
+});
+
+describe("efeitos pós-entrada DEPOIS da resposta (o Chat não espera dezenas de idas ao banco)", () => {
+  const msg = (id: string, text = "oi") => evento({ identity: ID_1, text, message_id: id, sender_name: "Maria" });
+  const rodarAgendadas = async () => {
+    const tarefas = requisicao.agendadas.splice(0);
+    await Promise.all(tarefas.map((t) => t()));
+  };
+
+  it("a resposta sai com a mensagem gravada e a conversa carimbada; os efeitos só rodam depois", async () => {
+    requisicao.ativa = true;
+    const { admin, t, rpcs } = bancoEmMemoria();
+
+    const r = await ingerirEventoDoChat(admin, { ...entrada, evento: msg("m1") });
+
+    expect(r).toMatchObject({ status: "ingested" });
+    expect(t.messages.some((m) => m.external_id === "m1")).toBe(true);
+    expect(rpcs.some((x) => x.nome === "fn_mark_conversation_message")).toBe(true);
+    expect(aplicarEfeitosPosEntrada).not.toHaveBeenCalled();
+    expect(requisicao.agendadas).toHaveLength(1);
+
+    await rodarAgendadas();
+    expect(aplicarEfeitosPosEntrada).toHaveBeenCalledTimes(1);
+    expect(aplicarEfeitosPosEntrada).toHaveBeenCalledWith(
+      admin,
+      expect.objectContaining({ texto: "oi", origem: "chat_externo_webhook", optOutPorPalavra: false }),
+    );
+  });
+
+  it("efeito que falha vira log de erro e NÃO derruba nada (o Chat já recebeu 200)", async () => {
+    requisicao.ativa = true;
+    const erro = vi.spyOn(logger, "error").mockImplementation(() => {});
+    aplicarEfeitosPosEntrada.mockRejectedValueOnce(new Error("banco fora"));
+    const { admin } = bancoEmMemoria();
+
+    const r = await ingerirEventoDoChat(admin, { ...entrada, evento: msg("m1") });
+    expect(r.status).toBe("ingested");
+    await expect(rodarAgendadas()).resolves.toBeUndefined();
+
+    expect(erro).toHaveBeenCalledWith(
+      "[chat-externo] efeito pós-entrada falhou",
+      expect.objectContaining({ efeito: "pos-entrada", detail: "banco fora" }),
+    );
+    erro.mockRestore();
+  });
+
+  it("duas mensagens seguidas da MESMA conversa: o efeito da segunda espera o da primeira terminar", async () => {
+    requisicao.ativa = true;
+    const ordem: string[] = [];
+    let liberar!: () => void;
+    const travada = new Promise<void>((resolve) => (liberar = resolve));
+    aplicarEfeitosPosEntrada
+      .mockImplementationOnce(async () => {
+        ordem.push("1:começa");
+        await travada;
+        ordem.push("1:termina");
+      })
+      .mockImplementationOnce(async () => {
+        ordem.push("2:começa");
+      });
+    const { admin } = bancoEmMemoria();
+
+    await ingerirEventoDoChat(admin, { ...entrada, evento: msg("m1", "primeira") });
+    await ingerirEventoDoChat(admin, { ...entrada, evento: msg("m2", "segunda") });
+    expect(requisicao.agendadas).toHaveLength(2);
+
+    const rodando = rodarAgendadas();
+    await new Promise((r) => setTimeout(r, 20));
+    expect(ordem).toEqual(["1:começa"]); // a segunda NÃO começou enquanto a primeira não acabou
+    liberar();
+    await rodando;
+    expect(ordem).toEqual(["1:começa", "1:termina", "2:começa"]);
+  });
+
+  it("reenvio (duplicata) não agenda efeito nenhum", async () => {
+    requisicao.ativa = true;
+    const { admin } = bancoEmMemoria();
+    await ingerirEventoDoChat(admin, { ...entrada, evento: msg("m1") });
+    requisicao.agendadas.length = 0;
+
+    const r = await ingerirEventoDoChat(admin, { ...entrada, evento: msg("m1") });
+    expect(r.status).toBe("duplicate");
+    expect(requisicao.agendadas).toHaveLength(0);
+  });
+
+  it("sem requisição (script, teste) os efeitos rodam na hora, como sempre rodaram", async () => {
+    const { admin } = bancoEmMemoria();
+    await ingerirEventoDoChat(admin, { ...entrada, evento: msg("m1") });
+    expect(aplicarEfeitosPosEntrada).toHaveBeenCalledTimes(1);
   });
 });
 

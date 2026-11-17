@@ -33,6 +33,7 @@
  * fora de escopo por decisão do dono; se o CPF casar com ele, a união acontece por si só.
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { after } from "next/server";
 
 import { audit } from "@/lib/audit";
 import { camposCpfParaGravar, hashCpf } from "@/lib/contacts/cpf";
@@ -369,7 +370,52 @@ async function receberMensagem(
   return { status: "ingested", conversationId: conversa.id, ...(primeiraId ? { messageId: primeiraId } : {}) };
 }
 
-/** Carimbo da conversa + alerta, agente e opt-out: os efeitos de uma mensagem NOVA do cliente. */
+/**
+ * ─── Por que os efeitos NÃO seguram a resposta ao Chat ──────────────────────────────────────────────────────
+ *
+ * O Chat entrega as mensagens de um mesmo chat em ORDEM e uma por vez: só manda a seguinte depois que o CRM
+ * responde à anterior. Os efeitos pós-entrada (demanda, campanha, follow-up, pedido de turno ao agente, dreno de
+ * eventos) são dezenas de idas ao banco em série — medido em 17/11/2026 numa instalação com o Supabase na nuvem:
+ * ~8 s por mensagem, e 8 mensagens seguidas chegaram a 68 s de atraso na Fila.
+ *
+ * Por isso o que aparece para a equipe fica DENTRO da resposta (a linha da mensagem e o carimbo da conversa: é o
+ * que acende a Fila), e o resto roda DEPOIS dela. Três cuidados, porque agora ninguém espera o resultado:
+ *   - falha de um efeito vira log de erro (e só dele): o Chat já recebeu 200 e não reenviaria, e reenviar não
+ *     repetiria o efeito mesmo assim (a duplicata sai antes dele);
+ *   - a ORDEM por conversa é mantida (uma cauda por conversa, neste processo): antes ela vinha de graça da
+ *     entrega serial do Chat, e rodar efeitos de mensagens seguidas em paralelo abriria corrida entre eles;
+ *   - sem requisição (teste, script de recuperação) não há `after`: roda na hora, como sempre rodou.
+ */
+const caudaDeEfeitos = new Map<string, Promise<void>>();
+
+async function emSegundoPlano(conversationId: string, rotulo: string, efeito: () => Promise<void>): Promise<void> {
+  // A cauda é montada quando a tarefa COMEÇA (depois da resposta), não quando é agendada: a ordem é a de início.
+  const rodar = (): Promise<void> => {
+    const anterior = caudaDeEfeitos.get(conversationId) ?? Promise.resolve();
+    const minha: Promise<void> = anterior
+      .then(efeito)
+      .catch((err: unknown) => {
+        logger.error("[chat-externo] efeito pós-entrada falhou", {
+          conversation_id: conversationId,
+          efeito: rotulo,
+          detail: err instanceof Error ? err.message.slice(0, 160) : "desconhecido",
+        });
+      })
+      .finally(() => {
+        if (caudaDeEfeitos.get(conversationId) === minha) caudaDeEfeitos.delete(conversationId);
+      });
+    caudaDeEfeitos.set(conversationId, minha);
+    return minha;
+  };
+  try {
+    after(rodar);
+  } catch {
+    // Fora de uma requisição o `after` não existe: roda e espera aqui mesmo.
+    await rodar();
+  }
+}
+
+/** Carimbo da conversa (na resposta) + alerta, agente e opt-out (depois dela): os efeitos de uma mensagem NOVA. */
 async function acordarOSistema(
   admin: SupabaseClient,
   entrada: Entrada,
@@ -387,22 +433,24 @@ async function acordarOSistema(
     canal: CANAL_DA_CONVERSA,
   });
 
-  await aplicarEfeitosPosEntrada(admin, {
-    organizationId: entrada.organizationId,
-    contactId: conversa.contact_id,
-    conversationId: conversa.id,
-    messageId,
-    channelSessionId: entrada.channelSessionId,
-    texto: ev.text,
-    nomeDoContato: ev.sender_name,
-    requestId: entrada.requestId,
-    origem: "chat_externo_webhook",
-    canal: CANAL_DA_CONVERSA,
-    // Atendimento ao vivo com botão próprio de "Encerrar atendimento": ali "sair" é sair do chat, não pedir
-    // para nunca mais receber mensagem. Achado na prova pela tela em 16/11/2026 (o contato de teste foi
-    // bloqueado ao digitar "#sair"). O agente continua escalando ao humano diante de um pedido provável.
-    optOutPorPalavra: false,
-  });
+  await emSegundoPlano(conversa.id, "pos-entrada", () =>
+    aplicarEfeitosPosEntrada(admin, {
+      organizationId: entrada.organizationId,
+      contactId: conversa.contact_id,
+      conversationId: conversa.id,
+      messageId,
+      channelSessionId: entrada.channelSessionId,
+      texto: ev.text,
+      nomeDoContato: ev.sender_name,
+      requestId: entrada.requestId,
+      origem: "chat_externo_webhook",
+      canal: CANAL_DA_CONVERSA,
+      // Atendimento ao vivo com botão próprio de "Encerrar atendimento": ali "sair" é sair do chat, não pedir
+      // para nunca mais receber mensagem. Achado na prova pela tela em 16/11/2026 (o contato de teste foi
+      // bloqueado ao digitar "#sair"). O agente continua escalando ao humano diante de um pedido provável.
+      optOutPorPalavra: false,
+    }),
+  );
 }
 
 type LinhaDaMensagem = {

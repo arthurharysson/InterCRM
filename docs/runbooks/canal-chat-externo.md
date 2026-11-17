@@ -171,6 +171,23 @@ o Chat não aceita (áudio, vídeo) ele mostra ao cliente como "anexo indisponí
 | `chat_externo_media_host_blocked` | O host da URL do anexo não é o do endereço do Chat cadastrado no canal |
 | Anexo do atendente chega "indisponível" ao cliente | `ATTACHMENT_FETCH_ALLOWED_HOSTS` do Chat sem o host do Storage, ou tipo que o Chat não aceita |
 
+## 9.1 Por que a mensagem do cliente chega rápido (e o que fica para depois)
+
+O Chat entrega as mensagens de um chat **uma por vez** e só manda a próxima quando o CRM responde à anterior.
+Por isso o CRM responde assim que a mensagem está gravada e a conversa carimbada (é isso que acende a Fila).
+Os efeitos pesados — demanda, campanha, follow-up, pedido de turno ao agente, opt-out — rodam **depois** da
+resposta (`emSegundoPlano` em `lib/channels/chat-externo/ingest.ts`, via `after()` do Next), em ordem por
+conversa. Antes, esses efeitos seguravam a resposta: ~8 s por mensagem numa instalação com Supabase na nuvem,
+e 68 s de atraso para oito mensagens seguidas (medido em 17/11/2026).
+
+- **Efeito que falha** vira `logger.error("[chat-externo] efeito pós-entrada falhou")` com a conversa e o efeito;
+  o Chat já recebeu `200` e não reenvia, e reenviar não repetiria o efeito (a duplicata sai antes dele).
+- **A ordem por conversa** é garantida dentro de UM processo do CRM. Com mais de uma instância do app, dois
+  efeitos da mesma conversa podem se sobrepor; os efeitos já foram desenhados para webhooks concorrentes (o
+  WhatsApp também os entrega em paralelo).
+- **Se o processo morrer** entre a resposta e o efeito (um deploy no instante errado), a mensagem fica na Fila,
+  mas o efeito daquela mensagem se perde. Para ver: procure o log acima e conversas sem o agente ter respondido.
+
 ## 10. Fora do alcance desta versão
 
 Reenvio **durável** da saída do CRM (fila + worker), selo/alertas por setor, LGPD cruzada entre os dois sistemas e
