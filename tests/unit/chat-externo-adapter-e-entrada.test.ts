@@ -226,6 +226,20 @@ describe("anexo do atendente (CRM → Chat)", () => {
     });
   });
 
+  it("anexo sem nome ou sem tipo OMITE o campo, nunca manda null (o Chat recusa null e mostraria 'indisponível')", async () => {
+    await chatExternoAdapter.send(
+      envelope({
+        kind: "image",
+        body: undefined,
+        media: { url: MIDIA.url, mime: null, filename: null, caption: null } as never,
+      }),
+    );
+    const [anexo] = corpoEnviado().attachments;
+    expect(anexo).toEqual({ kind: "image", url: MIDIA.url });
+    expect(anexo).not.toHaveProperty("name");
+    expect(anexo).not.toHaveProperty("mime");
+  });
+
   it("mensagem de texto não leva o campo `attachments`", async () => {
     await chatExternoAdapter.send(envelope());
     expect(corpoEnviado()).not.toHaveProperty("attachments");

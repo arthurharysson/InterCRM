@@ -285,8 +285,10 @@ export const chatExternoAdapter: ChannelAdapter = {
               {
                 kind: envelope.kind,
                 url: envelope.media.url,
-                mime: envelope.media.mime,
-                name: envelope.media.filename ?? null,
+                // Campo sem valor SAI do corpo: o Chat aceita ausente, mas recusa `null` e mostraria
+                // o anexo como "indisponível" para o cliente.
+                ...(envelope.media.mime ? { mime: envelope.media.mime } : {}),
+                ...(envelope.media.filename ? { name: envelope.media.filename } : {}),
               },
             ],
           }
