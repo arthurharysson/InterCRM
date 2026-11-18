@@ -15,7 +15,7 @@ export function TopBar() {
     // `InboxLayout.tsx`, "TopBar (h-16)"). Mudar esta altura sem mudar essas contas
     // estoura todas elas em silêncio. Ele é uma faixa encostada nas bordas, com a
     // linha de baixo alinhada à da barra lateral (as duas têm 64px de topo).
-    <header className="sticky top-[var(--faixas-de-cima,0px)] z-20 h-16 border-b bg-card">
+    <header className="sticky top-[var(--faixas-de-cima,0px)] z-20 h-16 border-b bg-card" data-casca="topo">
       <div className="flex h-full items-center justify-between gap-2 px-3 md:gap-4 md:px-6">
         <div className="flex min-w-0 items-center gap-2">
           <MobileSidebar />

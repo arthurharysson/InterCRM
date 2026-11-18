@@ -10,7 +10,7 @@ import { z } from "zod";
 
 import { ok, fail } from "@/lib/api/wrappers";
 import { requireRole } from "@/lib/auth/require-role";
-import { ROLE_RANK } from "@/lib/auth/types";
+import { roleAtLeast } from "@/lib/auth/types";
 import { requireSupportWrite } from "@/lib/impersonate/support";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { resultadoDaChamadaSchema } from "@/lib/webphone/config";
@@ -48,7 +48,7 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
     admin: createAdminClient(),
     orgId: authz.org.orgId,
     userId: authz.user.id,
-    podeEditarAlheias: ROLE_RANK[authz.org.role] >= ROLE_RANK.manager,
+    podeEditarAlheias: roleAtLeast(authz.org.role, "manager"),
     id,
     resultado: parsed.data.resultado,
   });

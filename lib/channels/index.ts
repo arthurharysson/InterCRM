@@ -4,6 +4,7 @@
  */
 import { datafyAdapter } from "./adapters/datafy";
 import { metaCloudAdapter } from "./adapters/meta-cloud";
+import { telegramAdapter } from "./adapters/telegram";
 import { wahaAdapter } from "./adapters/waha";
 import { chatExternoAdapter } from "./adapters/chat-externo";
 import { webAdapter } from "./adapters/web";
@@ -23,6 +24,7 @@ const ADAPTERS: Record<ProviderDeMensagem, ChannelAdapter | null> = {
   datafy: datafyAdapter,
   web: webAdapter,
   chat_externo: chatExternoAdapter,
+  telegram: telegramAdapter,
 };
 
 /**

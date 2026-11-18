@@ -65,6 +65,16 @@ const DIR_MIGRATIONS = path.join(process.cwd(), "supabase", "migrations");
  * dado existente faz o `update.sh` de um clone quebrar no meio.
  */
 const REMOCOES_DELIBERADAS: Record<string, { valores: string[]; porque: string }> = {
+  "20261111162814_9342_canal_do_bot_do_telegram.sql::conversations_channel_check": {
+    valores: ["web"],
+    porque:
+      "NÃO é remoção de propósito: é o ENCONTRO de duas cadeias. A 8804 (canal web do InterSuite, " +
+      "só deste fork) acrescentou `web` a conversations_channel_check; a 9342 (telegram, do upstream) " +
+      "reconstruiu a constraint a partir do estado que ENXERGAVA, sem o valor do fork. Nenhum dos " +
+      "lados errou: no upstream sozinho a 9342 não remove nada. A forward-fix é a 9110 " +
+      "(`canais_web_chat_externo_e_telegram_convivem`), que reafirma a UNIÃO — o estado FINAL da " +
+      "cadeia tem `web` de volta, então nenhum clone fica sem ele. Mesma forma da 0312→0326 acima.",
+  },
   "20260918231000_0312_aviso_de_followup_sem_agente.sql::agent_inbox_items_kind_check": {
     valores: ["aviso_de_caso_nao_entregue"],
     porque:

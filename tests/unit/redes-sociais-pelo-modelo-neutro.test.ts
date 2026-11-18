@@ -132,8 +132,9 @@ describe("CONTROLE: os canais que já existiam continuam declarados", () => {
   });
 
   it("o vocabulário de canal da conversa não mudou", () => {
-    // 'web' é o canal do fork (chat do InterSuite); os três do upstream seguem na frente, na mesma ordem.
-    expect([...CANAIS_DE_CONVERSA]).toEqual(["whatsapp", "instagram", "facebook", "web"]);
+    // `telegram` entrou pelo #3440 (o bot do @BotFather é canal de conversa, diferente do Telegram do catálogo
+    // social, que segue `inbox: false`); `web` é o canal do fork (chat do InterSuite) e fica por último.
+    expect([...CANAIS_DE_CONVERSA]).toEqual(["whatsapp", "telegram", "instagram", "facebook", "web"]);
   });
 
   it("a matriz de capabilities segue respondendo por todos os canais de mensagem", () => {
@@ -143,8 +144,11 @@ describe("CONTROLE: os canais que já existiam continuam declarados", () => {
       "zernio",
       "zernio_social",
       "datafy",
-      "web", // canal do fork (InterSuite); os cinco do upstream seguem na frente
+      "web", // canal do fork (InterSuite)
       "chat_externo", // canal do fork (página de chat própria); outro provider, não toca o `web`
+      // O canal do bot do Telegram (#3440) é provider de MENSAGEM, com matriz
+      // de capabilities própria — a matriz continua respondendo por todos.
+      "telegram",
     ]);
     for (const provider of PROVIDERS_DE_MENSAGEM) {
       const caps = capabilitiesOf(provider);

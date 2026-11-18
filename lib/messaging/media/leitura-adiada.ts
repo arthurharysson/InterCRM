@@ -128,6 +128,7 @@ export const LEITORES_DA_DESCRICAO: Record<string, string> = {
   "workers/ai-sentiment-worker.pedidos.ts": "agente que vê imagens",
   "lib/followup/atendimento.ts": "agente que vê imagens | inscrição sem agente",
   "lib/mcp/conferencia-de-campos.ts": "agente que vê imagens | token vivo",
+  "lib/mcp/media-derived-read.ts": "token vivo (só com o escopo messages:derived:read)",
   "lib/mcp/tools/propostas.ts": "agente que vê imagens | token vivo",
   "app/api/v1/messages/_handler.ts": "token vivo | humano: só áudio",
   "lib/conversoes/valor-da-conversa.ts": "conexão de anúncio | venda pelo canal",
@@ -142,6 +143,11 @@ export const LEITORES_DA_DESCRICAO: Record<string, string> = {
   "lib/api/handlers/types.ts": "tipo",
   "lib/types/messaging.ts": "tipo",
   "lib/messaging/media/leitura-adiada.ts": "este mapa",
+  // A máscara do texto retido (#4500): lê a coluna só para saber se HÁ texto a
+  // esconder e devolve `null` no lugar. Não entrega descrição a ninguém — pelo
+  // contrário, é o caminho que a tira do payload —, então não pede componente
+  // novo no predicado.
+  "lib/messaging/texto-retido.ts": "só mascara",
 };
 
 /**

@@ -41,12 +41,21 @@ import { PROVEDOR_POR_ASSINATURA, PROVEDORES } from "@/lib/ai/pontos/provedores"
 import { ModelPicker, useModelMeta } from "./ModelPicker";
 import { CHAVE_DA_INSTALACAO, CredentialPicker, STATUS_LABEL, findCredential } from "./CredentialPicker";
 import { rotuloDoEstadoDoCanal } from "@/lib/channels/estado";
+import { decidirAvisoDoModoDeTeste } from "@/lib/ai/elegibilidade/aviso-do-modo-de-teste";
+import { AvisoDoModoDeTeste } from "./AvisoDoModoDeTeste";
 import { bloqueioDePublicacao } from "@/lib/ai/agents/bloqueio-de-publicacao";
 import { mesmoRascunho } from "@/lib/ai/agents/mesmo-rascunho";
-import { ToolPicker } from "./ToolPicker";
+import {
+  CODIGO_NOME_DE_AGENTE_EM_USO,
+  NOME_DE_AGENTE_EM_USO,
+  RASCUNHO_SALVO_NOME_NAO_MUDOU,
+} from "@/lib/ai/agents/nome-repetido";
+import { ToolPicker, useCatalogoDeFerramentas } from "./ToolPicker";
+import { RolagemDeChegada, type Chegada } from "@/lib/ui/rolagem-de-chegada";
 import { TriggerEditor, type TriggerValue } from "./TriggerEditor";
 import { HandoffKeywordsInput } from "./HandoffKeywordsInput";
 import { LimiarDeSentimento } from "./LimiarDeSentimento";
+import { VozDoAgente } from "./VozDoAgente";
 import { FollowupFlowPicker } from "./FollowupFlowPicker";
 import {
   FollowupWindowEditor,
@@ -60,6 +69,7 @@ import type { SkillDisponivel } from "@/lib/ai/skills/skills-do-agente";
 import { FunisDoAgente, type CoberturaPorFunil } from "./FunisDoAgente";
 import { PublishConfirmDialog } from "./PublishConfirmDialog";
 import { ComandosDoCelular } from "./ComandosDoCelular";
+import { FraseDoAviso } from "./FraseDoAviso";
 import { ServidorExternoNoAtendimento } from "./ServidorExternoNoAtendimento";
 import { ServidoresMcpDoAgente } from "./ServidoresMcpDoAgente";
 import {
@@ -80,6 +90,11 @@ import type { CredentialRow, Provider } from "@/hooks/ai/useCredentials";
 import { credentialStatus } from "@/hooks/ai/useCredentials";
 import type { FunilDaResposta } from "@/hooks/pipelines/usePipelines";
 import { callbacksHabilitados } from "@/lib/followup/callback-policy";
+import {
+  EscolhaQuandoHaCompromisso,
+  lerEscolhaNoEnvio,
+} from "@/components/agenda/EscolhaQuandoHaCompromisso";
+import type { EscolhaNoEnvio } from "@/lib/agenda/escolha-no-envio";
 
 /**
  * O canal oferecido no seletor é exatamente o que `listSelectableChannels`
@@ -99,6 +114,13 @@ export type { ChannelSessionLite };
  * ouve o motivo junto do rótulo, sem depender de hover.
  */
 const ID_DO_MOTIVO_DO_PUBLICAR = "motivo-do-publicar";
+
+/**
+ * O id que liga o CAMPO de nome à frase que o servidor devolveu quando o nome já
+ * existia na organização (#3952). O `aria-describedby` do input aponta para cá:
+ * quem chega pelo leitor de tela ouve o motivo junto do campo.
+ */
+const ID_DO_ERRO_DO_NOME = "erro-do-nome";
 
 interface BaseProps {
   credentials: CredentialRow[];
@@ -215,7 +237,7 @@ interface FormState {
   reply_min_interval_ms: number | null;
   followup: FollowupValue;
   voz_enabled: boolean;
-  voz_quando: "nunca" | "espelhar" | "sempre";
+  voz_quando: "nunca" | "espelhar" | "sempre" | "quando_pede";
   // Papel OPERADOR (spec 16 §3.2) — o que mexe no sistema depois da conversa.
   operator_enabled: boolean;
   /** "" = herda o modelo do Conversador (vira null no payload). */
@@ -233,6 +255,17 @@ interface FollowupValue {
   callback_enabled: boolean;
   /** Ausente em versões antigas; null = sem janela própria. */
   send_window?: FollowupWindowValue | null;
+  /**
+   * #3813 — "Quando o contato tiver horário marcado" DESTE agente.
+   *
+   * Ausente nas versões gravadas antes desta entrega, e ausente é `adiar`: a
+   * leitura é tolerante (`lerEscolhaNoEnvio`), então quem nunca configurou não
+   * vê diferença e o jsonb que a tela grava continua sendo o de sempre.
+   *
+   * Mora ao lado de `send_window` porque as duas são regras de envio PROATIVO
+   * e é esta a configuração que o disparo lê (`lib/followup/janela-de-disparo`).
+   */
+  quando_ha_compromisso?: EscolhaNoEnvio;
 }
 
 const DEFAULT_FOLLOWUP: FollowupValue = {
@@ -421,7 +454,8 @@ function toVersionPayload(s: FormState) {
  * `mesmoRascunho` responde "salvar mudaria alguma coisa?" comparando os dois
  * payloads — mas o servidor NÃO grava o payload cru: `versionShapeSchema` faz
  * `.trim()` no prompt e completa o `trigger_config` com
- * `include_tags`/`exclude_tags`/`include_pipeline_ids`/`exclude_pipeline_ids`
+ * `include_tags`/`exclude_tags`/`include_pipeline_ids`/`exclude_pipeline_ids`/
+ * `include_sources`/`exclude_sources`
  * (`.default([])`). Comparar o formulário com o que está no banco sem passar os
  * dois pela MESMA régua acusava alteração para sempre, e Publicar ficava apagado
  * com "Salve o rascunho antes de publicar" mesmo depois de salvar — o defeito da
@@ -474,11 +508,39 @@ export function AgentForm(props: Props) {
   const [publishing, setPublishing] = React.useState(false);
   const [confirmOpen, setConfirmOpen] = React.useState(false);
   /**
+   * A chegada pelo link «Abrir o agente» da tela de Casos (`#cases_enabled`, #3975).
+   * O catálogo de capacidades carrega depois e empurra o interruptor para baixo
+   * de onde o navegador rolou: medido, fora da tela em 1280. SÓ NA MONTAGEM, como
+   * a chegada ao funil: o hash fica na URL depois de salvar.
+   */
+  const [chegada, setChegada] = React.useState<Chegada | null>(null);
+  React.useEffect(() => {
+    if (window.location.hash === "#cases_enabled") {
+      setChegada({ ancora: "cases_enabled", scrollY: window.scrollY });
+    }
+  }, []);
+  const terminarChegada = React.useCallback(() => setChegada(null), []);
+  const catalogoChegando = useCatalogoDeFerramentas().isFetching;
+  /**
    * Qual papel está aberto. Estado LOCAL e não rota: trocar de papel não é
    * navegação — o rascunho é um só, e uma URL por papel faria o usuário achar
    * que salvou um e não o outro.
    */
   const [papel, setPapel] = React.useState<"conversa" | "operacao" | "seguranca">("conversa");
+
+  /**
+   * A recusa do SERVIDOR que mora num CAMPO — hoje, só "esse nome já existe"
+   * (#3952).
+   *
+   * Fica fora de `validation` de propósito: aquela é a régua do cliente, que
+   * roda a cada tecla e descreve o que a pessoa ainda precisa preencher. Esta é
+   * a resposta de quem foi ao banco, e um toast no canto não serve — o erro é do
+   * campo de nome, e é ali que a pessoa olha. Some assim que ela digita (o
+   * primeiro caractere muda o nome que o banco recusou) e NÃO sobrevive a um
+   * reload: recarregar já mostra o formulário limpo, sem prometer um conflito
+   * que talvez não exista mais.
+   */
+  const [erroDoServidorNoNome, setErroDoServidorNoNome] = React.useState<string | null>(null);
 
   /**
    * A pergunta é "salvar mudaria alguma coisa?", e não "os dois objetos são
@@ -566,6 +628,17 @@ export function AgentForm(props: Props) {
   const cred = findCredential(props.credentials, form.credential_id);
   const credSt = cred ? credentialStatus(cred) : null;
   const channelSession = props.channelSessions.find((c) => c.id === form.channel_session_id);
+  /**
+   * O canal escolhido está em modo de teste e não responde ninguém? A tela dizia
+   * só o nome, o telefone e o estado da conexão; o canal nasce com a lista de
+   * teste vazia e a IA ficava muda sem ninguém entender por quê (#3976).
+   *
+   * O aviso é do CANAL ESCOLHIDO, não do agente: ele desaparece ao trocar para um
+   * número aberto, e volta se o número voltar. `readOnly` é o mesmo papel que
+   * trava a edição — quem não é administrador recebe o motivo sem o link que
+   * levaria a um 403 no painel de acesso.
+   */
+  const avisoDoCanal = decidirAvisoDoModoDeTeste({ acesso: channelSession?.acessoDaAi ?? null });
   const modelMeta = useModelMeta(form.provider, form.model);
 
   // ---------------------------------------------------------------------
@@ -714,6 +787,15 @@ export function AgentForm(props: Props) {
           cadastro.data,
         );
         if (!res.ok) {
+          // Nome repetido na organização (#3952): a frase vai para o CAMPO de
+          // nome, que é onde a pessoa olha e onde o conserto acontece — o toast
+          // do canto some sozinho e não diz qual campo mudar.
+          // A frase é montada AQUI, com `t()`: a `message` da Action é pt e
+          // quem usa es/en leria português no campo.
+          if (res.error === CODIGO_NOME_DE_AGENTE_EM_USO) {
+            setErroDoServidorNoNome(`${t(NOME_DE_AGENTE_EM_USO)} ${t(RASCUNHO_SALVO_NOME_NAO_MUDOU)}`);
+            return;
+          }
           toast.error(res.message ?? `${t("Erro")}: ${res.error}`);
           return;
         }
@@ -743,6 +825,11 @@ export function AgentForm(props: Props) {
         }
         const res = await createMcpAgentAction(validated.data);
         if (!res.ok) {
+          // Mesmo tratamento do salvar: recusa de nome mora no campo (#3952).
+          if (res.error === CODIGO_NOME_DE_AGENTE_EM_USO) {
+            setErroDoServidorNoNome(t(NOME_DE_AGENTE_EM_USO));
+            return;
+          }
           toast.error(res.message ?? `${t("Erro")}: ${res.error}`);
           return;
         }
@@ -955,13 +1042,42 @@ export function AgentForm(props: Props) {
           negócio, não de falar com cliente — a mesma separação que a spec 16
           impôs no resto da tela. */}
       {papel === "operacao" ? (
-        <FunisDoAgente
-          funis={funis}
-          cobertura={props.cobertura}
-          value={form.pipeline_ids}
-          onChange={(ids) => patch({ pipeline_ids: ids })}
-          disabled={disabled}
-        />
+        <>
+          {/*
+            O PACOTE LIGADO SEM FUNIL MARCADO (issue #4118, saída 3).
+
+            A ferramenta "Mover oportunidade de etapa" sozinha não move nada: quem
+            diz DE QUAIS funis o agente pode mexer é a caixa abaixo. Quem liga
+            "Vender e mover o funil" e não marca nenhum funil publica um agente que
+            conversa e não organiza — e só descobre na hora de iniciar a campanha,
+            com uma recusa em outra tela.
+
+            AVISO, não bloqueio: é uma configuração legítima (agente que só
+            conversa), e travar o Publicar por causa dela seria transformar uma
+            escolha em erro. Por isso este parágrafo não entra em
+            `publishBlockReason` nem em `isValid` — ele informa e some sozinho
+            quando a primeira caixa é marcada.
+          */}
+          {form.operator_tool_ids.includes("crm_move_lead_stage") &&
+          form.pipeline_ids.length === 0 ? (
+            <p
+              data-testid="aviso-vender-sem-funil"
+              role="status"
+              className="rounded-md border border-dashed border-amber-500/40 p-3 text-xs text-amber-700 dark:text-amber-400"
+            >
+              {t(
+                'O pacote "Vender e mover o funil" está ligado, mas nenhum funil está marcado logo abaixo: o agente não vai poder mover negócio de funil nenhum, e uma campanha de Prospecção não inicia com ele assim. Não é bloqueio — dá para salvar e publicar agora e marcar o funil depois.',
+              )}
+            </p>
+          ) : null}
+          <FunisDoAgente
+            funis={funis}
+            cobertura={props.cobertura}
+            value={form.pipeline_ids}
+            onChange={(ids) => patch({ pipeline_ids: ids })}
+            disabled={disabled}
+          />
+        </>
       ) : null}
 
       {/* Two-column grid */}
@@ -976,13 +1092,35 @@ export function AgentForm(props: Props) {
               <Input
                 id="name"
                 value={form.name}
-                onChange={(e) => patch({ name: e.target.value })}
+                onChange={(e) => {
+                  // Digitar é a resposta à recusa: o nome mudou, então a frase
+                  // "já existe" deixou de valer para o que está no campo.
+                  if (erroDoServidorNoNome) setErroDoServidorNoNome(null);
+                  patch({ name: e.target.value });
+                }}
                 disabled={disabled}
                 maxLength={120}
-                aria-invalid={!!validation.name}
+                aria-invalid={!!validation.name || !!erroDoServidorNoNome}
+                aria-describedby={erroDoServidorNoNome ? ID_DO_ERRO_DO_NOME : undefined}
               />
               {validation.name ? (
                 <p className="text-xs text-destructive">{validation.name}</p>
+              ) : null}
+              {/*
+                A recusa do SERVIDOR, embaixo do campo que a causou — e não no
+                toast do canto (#3952). `role="alert"` porque a frase aparece
+                depois de um envio: quem usa leitor de tela precisa ouvi-la sem
+                procurar na página.
+              */}
+              {erroDoServidorNoNome ? (
+                <p
+                  id={ID_DO_ERRO_DO_NOME}
+                  data-testid="erro-do-nome"
+                  role="alert"
+                  className="text-xs text-destructive"
+                >
+                  {erroDoServidorNoNome}
+                </p>
               ) : null}
             </div>
             <div className="space-y-1">
@@ -1141,6 +1279,7 @@ export function AgentForm(props: Props) {
                   ) : null}
                 </SelectContent>
               </Select>
+              <AvisoDoModoDeTeste aviso={avisoDoCanal} podeConfigurar={!readOnly} />
               {/*
                 NÃO é erro: é o estado normal de quem ainda não pareou o aparelho.
                 Antes, esta linha era vermelha e vinha de `validation`, que também
@@ -1426,6 +1565,13 @@ export function AgentForm(props: Props) {
                 "Precisa de uma credencial do ElevenLabs cadastrada e de uma voz escolhida em Agente de IA → Provedores. Sem os dois, o agente continua respondendo em texto — ligar aqui não quebra nada.",
               )}
             </p>
+            {form.voz_enabled && channelSession?.enviaNotaDeVoz === false ? (
+              <p className="text-xs text-amber-700 dark:text-amber-400" data-testid="voz-canal-sem-nota">
+                {t(
+                  "O canal escolhido não recebe nota de voz da IA (redes sociais como Instagram e Facebook). Nele, o agente responde em texto.",
+                )}
+              </p>
+            ) : null}
             {form.voz_enabled ? (
               <div className="space-y-1">
                 <Label htmlFor="voz_quando">{t("Quando falar")}</Label>
@@ -1441,15 +1587,35 @@ export function AgentForm(props: Props) {
                     <SelectItem value="espelhar">
                       {t("Só quando o cliente mandar áudio")}
                     </SelectItem>
+                    <SelectItem value="quando_pede">
+                      {t("Quando o cliente mandar ou pedir áudio")}
+                    </SelectItem>
                     <SelectItem value="sempre">{t("Sempre")}</SelectItem>
                     <SelectItem value="nunca">
                       {t("Nunca (desligado, sem apagar a configuração)")}
                     </SelectItem>
                   </SelectContent>
                 </Select>
+                {form.voz_quando === "quando_pede" ? (
+                  <p className="text-xs text-muted-foreground">
+                    {t(
+                      "Responde em áudio quando o cliente manda áudio, pede áudio por escrito ou avisa que não consegue ler. Quem pede para continuar no texto segue recebendo texto.",
+                    )}
+                  </p>
+                ) : null}
               </div>
             ) : null}
           </Card>
+
+          {/* A voz DESTE agente (#4228): grava em `ai_agents.config.voz_voice_id`,
+              por isso só em edição — como o limiar de sentimento logo abaixo. */}
+          {isEdit && (
+            <VozDoAgente
+              agentId={props.agent.id}
+              inicial={(props.agent.config ?? {}).voz_voice_id}
+              disabled={disabled}
+            />
+          )}
 
           {/* Capacidades */}
           <Card className="space-y-2 p-4">
@@ -1469,11 +1635,18 @@ export function AgentForm(props: Props) {
             ) : null}
           </Card>
 
-          {/* O acervo que este assistente consulta (0181) */}
+          {/* O acervo que este assistente consulta (0181). O MODO de leitura
+              (#4358) é `config` do agente: grava por PATCH imediato, como o
+              limiar de sentimento — por isso o cartão só recebe o id em
+              edição. */}
           <BasesDoAgente
             materiais={materiais}
             value={form.knowledge_source_ids}
             onChange={(ids) => patch({ knowledge_source_ids: ids })}
+            agentId={props.mode === "edit" ? props.agent.id : undefined}
+            modoInicial={
+              props.mode === "edit" ? (props.agent.config ?? {}).knowledge_mode : undefined
+            }
             disabled={disabled}
           />
 
@@ -1566,6 +1739,19 @@ export function AgentForm(props: Props) {
             />
           </Card>
 
+          {/* A FRASE que o cliente lê quando a conversa é passada para uma pessoa
+              (#3725; tela no #3816). Salva em `ai_agents.config.aviso_de_handoff`
+              — a chave que o `agentConfigPatchSchema` descartava, e por isso só se
+              configurava por SQL. Só em edição, como o cartão dos comandos do
+              celular: sem agente gravado não há id para o PATCH. */}
+          {isEdit && (
+            <FraseDoAviso
+              agentId={props.agent.id}
+              inicial={(props.agent.config ?? {}).aviso_de_handoff}
+              disabled={disabled}
+            />
+          )}
+
           {/* O OUTRO caminho para uma pessoa: o clima fechado
               (`ai.sentiment_alert`, em `workers/ai-sentiment-worker.ts`).
               Mesma chave que o worker já lia, agora com porta pública — issue
@@ -1585,6 +1771,7 @@ export function AgentForm(props: Props) {
             <div className="flex items-center gap-2">
               <Switch
                 id="cases_enabled"
+                className="scroll-mt-28"
                 checked={form.cases_enabled}
                 onCheckedChange={(v) => patch({ cases_enabled: v })}
                 disabled={disabled}
@@ -1667,6 +1854,31 @@ export function AgentForm(props: Props) {
               }
               disabled={disabled || !form.followup.enabled}
             />
+            {/*
+              #3813 — o SELETOR que faltava: o disparo já lia
+              `followup.quando_ha_compromisso` (`lib/agenda/
+              escolha-no-envio.ts`), mas não havia onde escolhê-la aqui, então
+              todo follow-up adiava para sempre. A mesma tela do passo de
+              automação, no mesmo lugar em que `send_window` mora — é a
+              configuração publicada que o worker lê.
+
+              Grava SEMPRE a chave, inclusive `adiar`: o PATCH da versão funde
+              o `followup` (`{...existing, ...patch}`), então omitir o padrão
+              não apagaria a escolha anterior — quem voltasse de "enviar" para
+              "adiar" ficaria preso em "enviar".
+            */}
+            <EscolhaQuandoHaCompromisso
+              escolha={lerEscolhaNoEnvio(form.followup)}
+              onChange={(quando_ha_compromisso: EscolhaNoEnvio) =>
+                patch({ followup: { ...form.followup, quando_ha_compromisso } })
+              }
+              disabled={disabled || !form.followup.enabled}
+            />
+            <p className="text-xs text-muted-foreground">
+              {t(
+                "Vale para todos os fluxos de follow-up deste agente. Cada passo de automação tem a escolha própria.",
+              )}
+            </p>
             <FollowupFlowPicker
               value={form.followup.flow_pointer_ids}
               onChange={(ids) =>
@@ -1717,6 +1929,10 @@ export function AgentForm(props: Props) {
           )}
         </div>
       </div>
+
+      {chegada && (
+        <RolagemDeChegada {...chegada} esperando={catalogoChegando} aoTerminar={terminarChegada} />
+      )}
 
       {/* Publish dialog */}
       {isEdit && props.draft ? (

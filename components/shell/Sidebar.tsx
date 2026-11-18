@@ -16,6 +16,7 @@ import { LogotipoDoProduto, SimboloDoProduto } from "@/components/branding/Marca
 import { marcaEhADoProduto } from "@/lib/branding";
 import { useMarcaDaInstalacao } from "@/lib/branding/contexto";
 import { GRUPO_NO_RODAPE, sidebarGroups } from "@/lib/navigation/registry";
+import { classeDoGrupo, classeDoItem } from "@/lib/navigation/classes-estaveis";
 import { usePrefetchPorIntencao } from "@/hooks/navigation/prefetchPorIntencao";
 
 const CHAVE_GRUPOS_FECHADOS = "sidebar-grupos-fechados";
@@ -194,6 +195,8 @@ export function SidebarContent({
           // arte para o escuro (Configurações › Marca); sem ela, uma arte pensada para
           // fundo claro pode ficar pouco legível.
           <div
+            // `data-logo-selo`: marcador que o CSS de aparência do upstream procura (menu escuro de template).
+            data-logo-selo={logoEscuro ? undefined : ""}
             // `min-w-0`: item de flex não encolhe abaixo do `min-width: auto`,
             // que é o valor padrão — sem isso, uma arte própria larga empurra o
             // botão de recolher para fora da barra em vez de encolher.
@@ -209,6 +212,7 @@ export function SidebarContent({
               <img
                 src={logo}
                 alt={nome}
+                data-logo={logoEscuro ? "claro" : undefined}
                 className={cn(
                   // `max-w-[min(10rem,100%)]` e não `max-w-[10rem]` sozinho, como o
                   // review mediu (#2723): a linha da logo tem ~207px úteis na barra
@@ -242,6 +246,7 @@ export function SidebarContent({
               <img
                 src={logoEscuro}
                 alt={nome}
+                data-logo="escuro"
                 className="hidden h-10 w-auto max-w-[min(11rem,100%)] object-contain dark:block"
               />
             ) : null}
@@ -364,7 +369,12 @@ export function SidebarContent({
           // seus itens — não há onde desenhar cabeçalho nem seta para fechá-lo.
           const aberto = collapsed || !gruposFechados.has(group.id);
           return (
-            <div key={group.id} className="space-y-1">
+            // `nav-grupo` (comum a todo grupo) e `nav-grupo-<id>` são contrato
+            // público: é por elas que o CSS personalizado de /admin/marca, que só
+            // aceita seletor de classe, dá cor ao menu inteiro ou a uma seção dele
+            // (#4463). Renomear quebra a folha de quem já instalou; documentado em
+            // docs/white-label.md.
+            <div key={group.id} className={cn("space-y-1 nav-grupo", classeDoGrupo(group.id))}>
               {/* Colapsado, o sidebar tem 64px: seis rótulos ali seriam ilegíveis.
                   Vira um filete separador, que preserva o agrupamento sem texto. */}
               {collapsed ? (
@@ -407,7 +417,8 @@ export function SidebarContent({
                           title={collapsed ? t(item.label) : undefined}
                           aria-current={isActive ? "page" : undefined}
                           onClick={onNavigate}
-                          className={classeDoDestino(isActive, collapsed)}
+                          // `classeDoItem` é contrato estável do CSS da tela Marca (#4463); o visual é o nosso.
+                          className={cn(classeDoItem(item.href), classeDoDestino(isActive, collapsed))}
                         >
                           <Icon size={20} weight={isActive ? "regular" : "light"} aria-hidden />
                           {!collapsed && <span className="truncate">{t(item.label)}</span>}
@@ -446,7 +457,7 @@ export function SidebarContent({
           );
         })}
       </nav>
-      <div className="border-t px-2 py-1">
+      <div className={cn("border-t px-2 py-1 nav-grupo", classeDoGrupo(GRUPO_NO_RODAPE))}>
         {rodape && (
           <Link
             href={rodape.href}
@@ -454,7 +465,7 @@ export function SidebarContent({
             title={collapsed ? t(rodape.label) : undefined}
             aria-current={pathname.startsWith(rodape.href) ? "page" : undefined}
             onClick={onNavigate}
-            className={cn("mb-0.5", classeDoDestino(pathname.startsWith(rodape.href), collapsed))}
+            className={cn("mb-0.5", classeDoItem(rodape.href), classeDoDestino(pathname.startsWith(rodape.href), collapsed))}
           >
             <Gear size={20} weight="light" aria-hidden />
             {!collapsed && <span className="truncate">{t(rodape.label)}</span>}
@@ -471,7 +482,7 @@ export function SidebarContent({
             title={collapsed ? t(ajuda.label) : undefined}
             aria-current={pathname.startsWith(ajuda.href) ? "page" : undefined}
             onClick={onNavigate}
-            className={cn("mb-0.5", classeDoDestino(pathname.startsWith(ajuda.href), collapsed))}
+            className={cn("mb-0.5", classeDoItem(ajuda.href), classeDoDestino(pathname.startsWith(ajuda.href), collapsed))}
           >
             <BookOpen size={20} weight="light" aria-hidden />
             {!collapsed && <span className="truncate">{t(ajuda.label)}</span>}
@@ -534,6 +545,10 @@ function BotaoDeRecolher({
 export function Sidebar({ collapsed }: { collapsed: boolean }) {
   return (
     <aside
+      // Ganchos da tela Aparência (`app/app/aparencia.css`): sem template
+      // escolhido nenhuma regra os usa, e o menu é exatamente o de antes.
+      data-casca="menu"
+      data-casca-lugar="lateral"
       className={cn(
         // ⚠️ `sticky`, e NUNCA `fixed`.
         //
@@ -584,7 +599,7 @@ export function Sidebar({ collapsed }: { collapsed: boolean }) {
         que parece solto é um cartão arredondado dentro dele. O `p-2` é o vão entre
         o cartão, a borda da janela e o conteúdo.
       */}
-      <div className="flex h-full w-full min-w-0 flex-col overflow-hidden border-r bg-card">
+      <div data-casca="menu-painel" className="flex h-full w-full min-w-0 flex-col overflow-hidden border-r bg-card">
         <SidebarContent collapsed={collapsed} />
       </div>
     </aside>

@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 
+import { CabecalhoDaSubTela } from "@/components/settings/CabecalhoDaSubTela";
 import { requireAuth, resolveActiveOrg } from "@/lib/auth/server";
 import { ROLE_RANK } from "@/lib/auth/types";
 import { traduzir } from "@/lib/i18n/dicionario";
@@ -26,15 +27,14 @@ export default async function WebphoneSettingsPage() {
 
   return (
     <div className="flex h-full flex-col gap-6 p-6">
-      <header>
-        <h1 className="text-2xl font-semibold tracking-tight">{traduzir("Telefone no navegador", idioma)}</h1>
+      <CabecalhoDaSubTela titulo={traduzir("Telefone no navegador", idioma)} idioma={idioma}>
         <p className="max-w-2xl text-sm text-muted-foreground">
           {traduzir(
             "Seus atendentes ligam e recebem chamadas pelo CRM, usando o ramal que a central telefônica da empresa já tem. URA, filas e transferência continuam na central.",
             idioma,
           )}
         </p>
-      </header>
+      </CabecalhoDaSubTela>
       <WebphoneSettingsClient initialData={(data as ConfiguracaoSalva | null) ?? null} />
     </div>
   );
