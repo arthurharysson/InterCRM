@@ -105,6 +105,11 @@ const MIGRATIONS_QUE_NAO_RODAM: Record<string, string> = {
     "cannot drop column needs_google_push of table calendar_appointments because other objects depend on it",
   "20260914170000_0243_chamada_de_api_tem_prazo_de_trava.sql":
     'role "authenticator" does not exist',
+  // DESTE FORK (telefonia no navegador), não do upstream. A 8801 cria a view `user_webphone_ramais_safe`
+  // com `create or replace`, e a 8803 a ampliou depois: sobre o estado de instalação (o baseline já tem a
+  // versão FINAL) a 8801 tentaria encolher a view. Não é defeito do clone que aplica a cadeia em ordem, onde
+  // a 8801 roda antes da 8803; é só que esta cerca parte do baseline, e não da cadeia desde o zero.
+  "20261031120000_8801_webphone_sip_por_organizacao.sql": "cannot drop columns from view",
 };
 
 /**
@@ -511,7 +516,7 @@ function formata(lista: { linha: string; lado: "cadeia" | "espelho" }[]): string
 }
 
 describe("baseline e cadeia de migrations chegam ao mesmo schema", () => {
-  it("a cadeia inteira aplica sobre o estado de instalação, menos as 8 declaradas", () => {
+  it("a cadeia inteira aplica sobre o estado de instalação, menos as declaradas", () => {
     const medidas = resultado.falhas.map((f) => f.arquivo).sort();
     const declaradas = Object.keys(MIGRATIONS_QUE_NAO_RODAM).sort();
 

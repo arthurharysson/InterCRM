@@ -87853,3 +87853,11 @@ comment on column public.attendant_sectors.external_code is
   'Código curto e estável com que um sistema externo (o bot do WhatsApp) indica o setor, ex.: suporte-tecnico. Minúsculo, único por organização.';
 
 notify pgrst, 'reload schema';
+
+-- APÊNDICE 20261118120100_9111_webphone_grants_explicitos.sql
+-- Grants explícitos das duas tabelas do webphone (a 8801 as criou confiando no default ACL do Supabase, que
+-- deixou de valer para tabela nova depois de 30/10/2026). Do tamanho que a RLS pressupõe; anon segue sem nada.
+grant select, insert, update, delete on public.org_webphone_settings to authenticated;
+grant all on public.org_webphone_settings to service_role;
+grant select, insert, update, delete on public.user_webphone_ramais to authenticated;
+grant all on public.user_webphone_ramais to service_role;

@@ -290,6 +290,24 @@ beforeAll(() => {
           values (v_proposta, v_org, 'RLS invariant item', 1, 1000, 1000);
         end if;
 
+        -- webphone (migrations 8801-8803, DESTE FORK): o servidor SIP é da organização e o ramal é da
+        -- pessoa. Os DOIS tenants recebem uma linha real, e a do ramal é do usuário semeado da própria
+        -- org — a policy de leitura só a mostra ao dono ou ao admin, então o controle positivo de
+        -- org A só passa se o dono ler o que é seu.
+        if not exists (select 1 from public.org_webphone_settings where organization_id = v_org) then
+          insert into public.org_webphone_settings (organization_id, wss_url, sip_domain)
+          values (v_org, 'wss://pbx.rls.test/ws', 'pbx.rls.test');
+        end if;
+        if not exists (select 1 from public.user_webphone_ramais where organization_id = v_org) then
+          insert into public.user_webphone_ramais
+            (organization_id, user_id, ramal, secret_encrypted, secret_iv, secret_tag, secret_last4)
+          values (
+            v_org,
+            case when v_org = '${ORG_A}'::uuid then '${USER_A}'::uuid else '${USER_B}'::uuid end,
+            'rls-1001', decode('00', 'hex'), decode('00', 'hex'), decode('00', 'hex'), '0000'
+          );
+        end if;
+
         -- 0772 (#3316) — a fila de proposta de campo do card lida num documento:
         -- o trecho e os valores sao o dado que a IA leu sobre a PESSOA, e a
         -- linha existe so ate alguem confirmar em revisao. Os DOIS tenants
@@ -788,6 +806,11 @@ export const TABLES = [
   // consistência contra crm_proposals.organization_id. Confirmado com o
   // insert do seed acima, que usa a mesma org nos dois lados.
   "crm_proposal_items",
+  // webphone (migrations 8801-8803, DESTE FORK): servidor SIP por organização e ramal por pessoa.
+  // A leitura da primeira é de qualquer membro; a do ramal, só do dono ou de `admin` (o usuário
+  // semeado é dono do próprio). A ESCRITA exige `admin` e não é medida aqui.
+  "org_webphone_settings",
+  "user_webphone_ramais",
   // 0227 — texto de sugestões: org + visibilidade da conversa por authenticated.
   "ai_reply_drafts",
   // migration 0349 — credenciais do trunk SIP por organizacao. Leitura e
