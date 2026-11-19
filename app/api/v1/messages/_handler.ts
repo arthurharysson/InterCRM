@@ -236,6 +236,34 @@ export function origemDaMensagem(actor: Actor): "user" | "ai" | "automation" | "
   return "ai";
 }
 
+/**
+ * Quem é a mensagem para o canal: o id interno dela, o da conversa e o autor.
+ *
+ * Os canais que falam com um sistema de fora (`web`, `chat_externo`) deduplicam e
+ * associam a thread por estes ids — e o Chat recusa com 400 uma mensagem sem
+ * `message_id`. Só o ramo de TEXTO os passava; os dois ramos de MÍDIA seguiam sem
+ * eles, e todo anexo do atendente para o cliente do chat voltava
+ * `chat_externo_send_failed_400`. Um ponto só monta os quatro campos, para um
+ * ramo novo de envio não esquecê-los de novo.
+ */
+export function identidadeDaMensagemParaCanal(
+  conversationId: string,
+  messageId: string,
+  ctx: Pick<HandlerCtx, "actor" | "onBehalfOf">,
+): {
+  conversationId: string;
+  messageId: string;
+  authorKind: "ai" | "agent";
+  authorName: string | null;
+} {
+  return {
+    conversationId,
+    messageId,
+    authorKind: origemDaMensagem(ctx.actor) === "ai" ? "ai" : "agent",
+    authorName: ctx.onBehalfOf?.userName ?? null,
+  };
+}
+
 const MSG_COLS =
   "id, organization_id, conversation_id, channel_session_id, contact_id, external_id, type, direction, status, ack, error_code, error_message, body, media_url, media_mime, media_size_bytes, media_storage_path, media_derived_text, media_derived_status, sent_via, sent_by_user_id, sent_on_behalf_of_user_id, sent_at, delivered_at, read_at, metadata, edited_at, revoked_at, reply_to_message_id, created_at, template_name, template_language, updated_at";
 
@@ -1449,6 +1477,7 @@ export async function sendMessageHandler(
           // O id que a PLATAFORMA conhece, lido da linha citada agora — não uma
           // cópia guardada no envio, que poderia divergir da linha.
           replyToExternalId: citada?.external_id ?? null,
+          ...identidadeDaMensagemParaCanal(c.id, message.id, ctx),
         }));
       } else if (input.media_url) {
         // A spec da proposta comercial já previa isto ("Enviar | sendFile com
@@ -1488,6 +1517,7 @@ export async function sendMessageHandler(
             caption: corpoDoCanal(input.body ?? null),
           },
           replyToExternalId: citada?.external_id ?? null,
+          ...identidadeDaMensagemParaCanal(c.id, message.id, ctx),
         }));
       } else if (input.type === "contact") {
         const sc = outboundMetadata.shared_contact as
@@ -1529,10 +1559,7 @@ export async function sendMessageHandler(
           kind: input.type,
           body: corpoDoCanal(input.body ?? "") ?? "",
           replyToExternalId: citada?.external_id ?? null,
-          conversationId: c.id,
-          messageId: message.id,
-          authorKind: origemDaMensagem(ctx.actor) === "ai" ? "ai" : "agent",
-          authorName: ctx.onBehalfOf?.userName ?? null,
+          ...identidadeDaMensagemParaCanal(c.id, message.id, ctx),
         }));
       }
 
