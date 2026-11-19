@@ -217,6 +217,24 @@ describe("chat.closed_by_customer e eventos desconhecidos", () => {
     });
   });
 
+  it("lê o vencimento por inatividade, com a data quando vem e sem ela quando não vem", () => {
+    expect(lerEventoDoChat(JSON.stringify({ event: "chat.expired", identity: ID }))).toEqual({
+      ok: true,
+      evento: { event: "chat.expired", identity: ID, expired_at: null },
+    });
+    expect(
+      lerEventoDoChat(JSON.stringify({ event: "chat.expired", identity: ID, expired_at: "2026-11-19T20:00:00Z" })),
+    ).toEqual({ ok: true, evento: { event: "chat.expired", identity: ID, expired_at: "2026-11-19T20:00:00.000Z" } });
+  });
+
+  it("vencimento sem identidade é recusado nomeando o campo", () => {
+    expect(lerEventoDoChat(JSON.stringify({ event: "chat.expired" }))).toEqual({
+      ok: false,
+      motivo: "contrato_violado",
+      campos: ["identity"],
+    });
+  });
+
   it("evento que o CRM não conhece é recusado nomeando só o campo `event`", () => {
     expect(lerEventoDoChat(JSON.stringify({ event: "chat.typing", identity: ID }))).toEqual({
       ok: false,

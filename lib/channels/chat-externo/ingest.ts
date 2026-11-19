@@ -24,6 +24,11 @@
  *    idempotente, e falha do banco no fechamento lança para o Chat reenviar. A demanda NÃO é fechada junto: a RPC
  *    deixa o "próximo passo" de revisar o atendimento, como em qualquer fechamento.
  *
+ *  `chat.expired`
+ *    o Chat venceu o atendimento por inatividade (o cliente abriu o link e sumiu, sem encerrar). Sem este aviso a
+ *    conversa ficava "Aguardando" na Fila para sempre, esperando um cliente que não está mais lá. Faz o mesmo que
+ *    `chat.closed_by_customer` — aviso de sistema + fechamento —, com texto e motivo próprios.
+ *
  * ═══ POR QUE UM CONTATO POR CHAT, E O QUE O CPF FAZ ═════════════════════════════════════════════
  *
  * Há uma conversa por (organização, contato, canal). Para 1 link = 1 conversa, o contato nasce POR CHAT, com
@@ -78,6 +83,8 @@ export async function ingerirEventoDoChat(
       return receberMensagem(admin, entrada, evento);
     case "chat.closed_by_customer":
       return avisarEncerramento(admin, entrada, evento);
+    case "chat.expired":
+      return avisarExpiracao(admin, entrada, evento);
   }
 }
 
@@ -561,17 +568,68 @@ async function avisarEncerramento(
   const conversa = await conversaDaIdentidade(admin, entrada, ev.identity);
   if (!conversa) return { status: "ignored", reason: "conversa_desconhecida" };
 
-  const avisou = await gravarAvisoDeEncerramento(admin, entrada, conversa, ev);
-  const fechou = await fecharConversaDoCliente(admin, entrada, conversa.id);
+  const avisou = await gravarAvisoDeEncerramento(admin, entrada, conversa, ev.identity, ENCERRADO_PELO_CLIENTE, ev.closed_at);
+  const fechou = await fecharConversaDoCliente(admin, entrada, conversa.id, ENCERRADO_PELO_CLIENTE.encerrado_por);
   return { status: avisou || fechou ? "ingested" : "duplicate", conversationId: conversa.id };
 }
+
+// ─── chat.expired ────────────────────────────────────────────────────────────────────────────────
+
+/**
+ * O Chat venceu o atendimento por inatividade: o cliente abriu o link e sumiu sem encerrar. O desfecho no CRM é o
+ * mesmo do encerramento pelo cliente — aviso de sistema na linha do tempo e a conversa SAI DA FILA —, porque o
+ * problema é o mesmo: uma conversa aberta esperando alguém que não vai responder. Mesma idempotência, mesma
+ * `fn_service_status`, e também NÃO avisa o Chat de volta (foi ele quem encerrou).
+ *
+ * Conversa desconhecida (`ignored`): o Chat só avisa chats que ele abriu, mas um `chat.started` que ainda não
+ * chegou, ou uma conversa apagada, não é motivo para o Chat reenviar por 24 h.
+ */
+async function avisarExpiracao(
+  admin: SupabaseClient,
+  entrada: Entrada,
+  ev: Extract<EventoDoChat, { event: "chat.expired" }>,
+): Promise<ResultadoDoChat> {
+  const conversa = await conversaDaIdentidade(admin, entrada, ev.identity);
+  if (!conversa) return { status: "ignored", reason: "conversa_desconhecida" };
+
+  const avisou = await gravarAvisoDeEncerramento(admin, entrada, conversa, ev.identity, EXPIRADO_POR_INATIVIDADE, ev.expired_at);
+  const fechou = await fecharConversaDoCliente(admin, entrada, conversa.id, EXPIRADO_POR_INATIVIDADE.encerrado_por);
+  return { status: avisou || fechou ? "ingested" : "duplicate", conversationId: conversa.id };
+}
+
+/** O que muda entre os dois fins de atendimento que partem do Chat: o texto, o rótulo e o motivo da auditoria. */
+interface FimDoAtendimento {
+  /** Sufixo do `external_id` do aviso (determinístico: o reenvio do Chat não vira duas linhas). */
+  sufixo: string;
+  corpo: string;
+  /** `metadata.aviso_de_sistema` — o que a tela e os relatórios leem. */
+  aviso: string;
+  /** `metadata.encerrado_por` da auditoria `conversation.closed`. */
+  encerrado_por: string;
+}
+
+const ENCERRADO_PELO_CLIENTE: FimDoAtendimento = {
+  sufixo: "encerrado",
+  corpo: "O cliente encerrou o atendimento pelo chat.",
+  aviso: "encerrado_pelo_cliente",
+  encerrado_por: "cliente",
+};
+
+const EXPIRADO_POR_INATIVIDADE: FimDoAtendimento = {
+  sufixo: "expirado",
+  corpo: "O chat foi encerrado por inatividade do cliente.",
+  aviso: "expirado_por_inatividade",
+  encerrado_por: "inatividade",
+};
 
 /** `true` quando gravou o aviso agora; `false` quando ele já existia (reenvio do Chat). */
 async function gravarAvisoDeEncerramento(
   admin: SupabaseClient,
   entrada: Entrada,
   conversa: { id: string; contact_id: string },
-  ev: Extract<EventoDoChat, { event: "chat.closed_by_customer" }>,
+  identidade: string,
+  fim: FimDoAtendimento,
+  quando: string | null,
 ): Promise<boolean> {
   const { error } = await admin.from("messages").insert({
     organization_id: entrada.organizationId,
@@ -579,14 +637,14 @@ async function gravarAvisoDeEncerramento(
     contact_id: conversa.contact_id,
     channel_session_id: entrada.channelSessionId,
     // Determinístico: o Chat reenviando o mesmo aviso não vira duas linhas.
-    external_id: `${FONTE}:${ev.identity}:encerrado`,
+    external_id: `${FONTE}:${identidade}:${fim.sufixo}`,
     direction: "outbound",
     sent_via: "system",
     status: "delivered",
     type: "text",
-    body: "O cliente encerrou o atendimento pelo chat.",
-    metadata: { source: FONTE, aviso_de_sistema: "encerrado_pelo_cliente" },
-    ...(ev.closed_at ? { sent_at: ev.closed_at } : {}),
+    body: fim.corpo,
+    metadata: { source: FONTE, aviso_de_sistema: fim.aviso },
+    ...(quando ? { sent_at: quando } : {}),
   });
   if (error?.code === "23505") return false;
   if (error) throw new Error(`chat_externo_closed_notice_failed: ${error.message}`);
@@ -601,6 +659,7 @@ async function fecharConversaDoCliente(
   admin: SupabaseClient,
   entrada: Entrada,
   conversationId: string,
+  encerradoPor: string,
 ): Promise<boolean> {
   const { data, error } = await admin
     .from("conversations")
@@ -627,14 +686,14 @@ async function fecharConversaDoCliente(
     throw new Error(`chat_externo_close_failed: ${erroFechar.code}`);
   }
 
-  // Sem ator humano: quem encerrou foi o cliente, pelo chat. Fire-and-forget, como todo `audit`.
+  // Sem ator humano: quem encerrou foi o cliente (ou o tempo dele), pelo chat. Fire-and-forget, como todo `audit`.
   void audit({
     action: "conversation.closed",
     organizationId: entrada.organizationId,
     resourceType: "conversation",
     resourceId: conversationId,
     requestId: entrada.requestId,
-    metadata: { via: "chat_externo", encerrado_por: "cliente" },
+    metadata: { via: "chat_externo", encerrado_por: encerradoPor },
   });
   return true;
 }

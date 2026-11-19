@@ -635,6 +635,77 @@ describe("chat.closed_by_customer", () => {
   });
 });
 
+describe("chat.expired", () => {
+  const expirou = () => evento({ event: "chat.expired", identity: ID_1 });
+
+  it("conversa que o CRM não conhece: ignorado, sem criar nada", async () => {
+    const { admin, t } = bancoEmMemoria();
+    const r = await ingerirEventoDoChat(admin, { ...entrada, evento: expirou() });
+    expect(r).toMatchObject({ status: "ignored", reason: "conversa_desconhecida" });
+    expect(t.conversations).toHaveLength(0);
+  });
+
+  it("registra UM aviso de inatividade e FECHA a conversa; o reenvio vira duplicata", async () => {
+    const { admin, t, rpcs } = bancoEmMemoria();
+    await ingerirEventoDoChat(admin, { ...entrada, evento: evento({ ...INICIO, sector: undefined, history: [] }) });
+
+    const a = await ingerirEventoDoChat(admin, { ...entrada, evento: expirou() });
+    const b = await ingerirEventoDoChat(admin, { ...entrada, evento: expirou() });
+
+    expect(a.status).toBe("ingested");
+    expect(b.status).toBe("duplicate");
+    const avisos = t.messages.filter((m) => (m.metadata as Linha)?.aviso_de_sistema === "expirado_por_inatividade");
+    expect(avisos).toHaveLength(1);
+    expect(avisos[0]!).toMatchObject({ sent_via: "system", direction: "outbound" });
+    // A conversa sai da Fila pelo MESMO caminho do botão "Encerrar", não por um UPDATE solto.
+    expect(t.conversations[0]!.status).toBe("closed");
+    expect(rpcs.filter((x) => x.nome === "fn_service_status")).toHaveLength(1);
+  });
+
+  it("audita UMA vez, dizendo que o motivo foi a inatividade (e não o cliente)", async () => {
+    const { admin } = bancoEmMemoria();
+    await ingerirEventoDoChat(admin, { ...entrada, evento: evento({ ...INICIO, sector: undefined, history: [] }) });
+
+    await ingerirEventoDoChat(admin, { ...entrada, evento: expirou(), requestId: "req-1" });
+    await ingerirEventoDoChat(admin, { ...entrada, evento: expirou(), requestId: "req-2" });
+
+    expect(audit).toHaveBeenCalledTimes(1);
+    expect(audit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: "conversation.closed",
+        metadata: expect.objectContaining({ via: "chat_externo", encerrado_por: "inatividade" }),
+      }),
+    );
+  });
+
+  it("conversa que a equipe JÁ resolveu: não reabre, não chama a RPC e não audita", async () => {
+    const { admin, t, rpcs } = bancoEmMemoria();
+    await ingerirEventoDoChat(admin, { ...entrada, evento: evento({ ...INICIO, sector: undefined, history: [] }) });
+    t.conversations[0]!.status = "resolved";
+
+    await ingerirEventoDoChat(admin, { ...entrada, evento: expirou() });
+
+    expect(rpcs.some((x) => x.nome === "fn_service_status")).toBe(false);
+    expect(audit).not.toHaveBeenCalled();
+    expect(t.conversations[0]!.status).toBe("resolved");
+  });
+
+  it("o banco falha ao fechar: LANÇA (o Chat reenvia) e o reenvio fecha sem duplicar o aviso", async () => {
+    const { admin, t, falhas } = bancoEmMemoria();
+    await ingerirEventoDoChat(admin, { ...entrada, evento: evento({ ...INICIO, sector: undefined, history: [] }) });
+
+    falhas.fechamento = { code: "XX000", message: "boom" };
+    await expect(ingerirEventoDoChat(admin, { ...entrada, evento: expirou() })).rejects.toThrow(/chat_externo_close_failed/);
+    expect(t.conversations[0]!.status).toBe("open");
+
+    falhas.fechamento = null;
+    const r = await ingerirEventoDoChat(admin, { ...entrada, evento: expirou() });
+    expect(r.status).toBe("ingested");
+    expect(t.conversations[0]!.status).toBe("closed");
+    expect(t.messages.filter((m) => (m.metadata as Linha)?.aviso_de_sistema === "expirado_por_inatividade")).toHaveLength(1);
+  });
+});
+
 /*
  * O QUE ESTE ARQUIVO NÃO PROVA: o SQL real. `fn_upsert_wa_conversation`, `fn_request_channel_routing`, o índice único
  * por CPF, a constraint `contacts_cpf_consistency` e a unicidade de `messages.external_id` são simulados acima.
