@@ -254,6 +254,12 @@ Campo novo `event` (default `"message"` ⇒ compatível com v1).
 **`chat.closed_by_customer`** — o cliente encerrou (botão "encerrar" na página). CRM fecha/atualiza o status da conversa
 conforme regra do canal.
 
+**`chat.expired`** — o Chat venceu o atendimento por inatividade (12 h sem atividade): o cliente abriu o link e sumiu
+sem encerrar. Corpo: `{ "event": "chat.expired", "identity": "web:<uuid>", "expired_at": "<ISO-8601>" }`. O CRM faz o
+mesmo que em `chat.closed_by_customer` (aviso na linha do tempo e conversa fora da Fila), com o motivo "inatividade".
+Só vai para chat que o cliente abriu. **Ordem de implantação:** o CRM precisa entender o evento ANTES de o Chat passar
+a mandá-lo (um CRM antigo recusa o evento desconhecido com 400).
+
 **`chat.typing`** (fase 2) — opcional, **sem** idempotência nem persistência; descartável.
 
 ### 6.2 CRM → Chat

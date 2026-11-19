@@ -3,11 +3,12 @@
  *
  * É o lado do CRM do contrato descrito em `rascunhos/chat-web/PLANO-CHAT-WEB.md` (seção 6). O Chat é uma
  * aplicação SEPARADA: o cliente conversa numa página web (aberta pelo botão que o bot do WhatsApp manda) e
- * o atendente responde pelo CRM. A ponte são três eventos assinados por HMAC:
+ * o atendente responde pelo CRM. A ponte são quatro eventos assinados por HMAC:
  *
  *   - `chat.started`            o cliente abriu o link pela primeira vez → nasce a conversa, na Fila;
  *   - `message`                 mensagem do cliente (sem o campo `event`, vale como `message`: compatível com a v1);
- *   - `chat.closed_by_customer` o cliente encerrou.
+ *   - `chat.closed_by_customer` o cliente encerrou;
+ *   - `chat.expired`            o Chat venceu o atendimento por inatividade (o cliente foi embora sem encerrar).
  *
  * Este canal NÃO é o do InterSuite (`web`): é outro provider, com contrato próprio e segredo POR CANAL.
  * O `web` continua exatamente como está.
@@ -86,6 +87,12 @@ export type EventoDoChat =
       event: "chat.closed_by_customer";
       identity: string;
       closed_at: string | null;
+    }
+  | {
+      /** O Chat venceu o atendimento por inatividade: o cliente abriu o link e foi embora sem encerrar. */
+      event: "chat.expired";
+      identity: string;
+      expired_at: string | null;
     };
 
 export type LeituraDoEvento =
@@ -230,6 +237,10 @@ export function lerEventoDoChat(rawBody: string): LeituraDoEvento {
 
   if (nome === "chat.closed_by_customer") {
     return { ok: true, evento: { event: "chat.closed_by_customer", identity, closed_at: dataIso(o.closed_at) } };
+  }
+
+  if (nome === "chat.expired") {
+    return { ok: true, evento: { event: "chat.expired", identity, expired_at: dataIso(o.expired_at) } };
   }
 
   // Evento que o CRM não conhece (por exemplo, um `chat.typing` da fase 2): não é erro do Chat, e o CRM não
